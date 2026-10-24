@@ -1,0 +1,23 @@
+{
+  "name": "@inbox-handoff/extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "build:edge": "wxt build -b edge",
+    "build:e2e": "wxt build --mode e2e",
+    "zip": "wxt zip",
+    "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
+    "build:all": "wxt build && wxt build -b edge && wxt build --mode e2e && wxt build -b edge --mode e2e"
+  },
+  "dependencies": {
+    "@inbox-handoff/gmail-extract": "0.0.0",
+    "@inbox-handoff/protocol": "0.0.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "wxt": "0.21.4"
+  }
+}

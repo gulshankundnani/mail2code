@@ -1,0 +1,12 @@
+{
+  "name": "@inbox-handoff/gmail-extract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@inbox-handoff/protocol": "0.0.0"
+  }
+}

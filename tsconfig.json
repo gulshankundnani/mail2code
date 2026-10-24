@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "*.config.ts"],
+  // DOM code is checked by its own tsconfig (packages/gmail-extract, apps/extension).
+  "exclude": ["packages/gmail-extract/**"]
+}

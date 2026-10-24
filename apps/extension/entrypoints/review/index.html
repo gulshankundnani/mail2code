@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review handoff – Inbox Handoff</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main>
+    <h1>Review before sending to Claude</h1>
+    <p class="notice" id="what-is-sent">
+      Nothing has been sent yet. When you click <strong>Send to Claude</strong>, the email text shown below, its subject,
+      sender, date, Gmail link and your instructions go to the Inbox Handoff desktop bridge on this computer. The bridge
+      gives them to your own Claude Code, which sends them to Anthropic's API to prepare a plan. Claude only reads your
+      project while planning. Nothing is changed until you approve a specific plan.
+    </p>
+
+    <div id="status" role="status" aria-live="polite"></div>
+
+    <form id="form" hidden>
+      <fieldset>
+        <legend>What to send</legend>
+        <label><input type="radio" name="scope" value="message" checked> One message</label>
+        <label><input type="radio" name="scope" value="thread"> <span id="thread-label">Whole conversation</span></label>
+        <p id="collapsed-note" class="warn" hidden></p>
+      </fieldset>
+
+      <section aria-labelledby="messages-heading">
+        <h2 id="messages-heading">Captured messages</h2>
+        <p class="hint">Subject: <span id="subject"></span></p>
+        <ol id="messages"></ol>
+      </section>
+
+      <fieldset>
+        <legend>Task</legend>
+        <label for="project">Project</label>
+        <select id="project" required disabled><option value="">Loading…</option></select>
+        <p id="project-note" class="hint"></p>
+
+        <label for="title">Title</label>
+        <input id="title" maxlength="300" required>
+
+        <label for="instructions">Instructions for Claude (optional)</label>
+        <textarea id="instructions" rows="4" maxlength="20000"></textarea>
+
+        <div class="row">
+          <div>
+            <label for="priority">Priority</label>
+            <select id="priority">
+              <option value="low">Low</option>
+              <option value="normal" selected>Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div>
+            <label for="due">Due date (optional)</label>
+            <input id="due" type="date">
+          </div>
+        </div>
+      </fieldset>
+
+      <details id="payload-details">
+        <summary>Exactly what will be sent</summary>
+        <pre id="payload" tabindex="0"></pre>
+      </details>
+
+      <div class="actions">
+        <button type="submit" id="send" disabled>Send to Claude</button>
+        <button type="button" id="cancel" class="secondary">Cancel</button>
+      </div>
+    </form>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

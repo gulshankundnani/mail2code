@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Inbox - Synthetic Mail</title></head>
+<body>
+<div id="app">
+  <div role="main" id="list">
+    <table><tr><td><a href="#inbox/FMfcgzSyntheticThread0007" id="open-thread">Weekly sync notes</a></td></tr></table>
+  </div>
+</div>
+<template id="conversation">
+  <div role="main">
+    <div gh="mtb" class="G-atb"><div role="button" aria-label="Archive">Archive</div></div>
+    <h2 class="hP">Weekly sync notes</h2>
+    <div class="adn ads" data-message-id="#msg-f:1790000000000000071">
+      <span class="gD" email="sam@example.test" name="Sam">Sam</span>
+      <span class="g3" title="Oct 6, 2026, 4:00 PM">4:00 PM</span>
+      <div class="a3s aiL"><div>Action item: rename the config flag.</div></div>
+    </div>
+  </div>
+</template>
+<script>
+  // Models Gmail's client-side navigation: the URL hash changes and the main
+  // pane is replaced without a page load.
+  function render() {
+    const app = document.getElementById("app");
+    if (location.hash.startsWith("#inbox/")) {
+      app.replaceChildren(document.getElementById("conversation").content.cloneNode(true));
+    } else if (!document.getElementById("list")) {
+      location.reload();
+    }
+  }
+  window.addEventListener("hashchange", render);
+</script>
+</body>
+</html>

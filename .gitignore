@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+.env
+.env.*
+!.env.example
+.spike-output/
+.wxt/
+.output/
+test-results/
+playwright-report/
+.DS_Store
+Thumbs.db
