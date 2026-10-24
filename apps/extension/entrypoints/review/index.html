@@ -3,24 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Review handoff – Inbox Handoff</title>
-  <link rel="stylesheet" href="./style.css">
+  <title>Review email – Inbox Handoff</title>
+  <link rel="stylesheet" href="../../assets/common.css">
 </head>
 <body>
   <main>
-    <h1>Review before sending to Claude</h1>
-    <p class="notice" id="what-is-sent">
-      Nothing has been sent yet. When you click <strong>Send to Claude</strong>, the email text shown below, its subject,
-      sender, date, Gmail link and your instructions go to the Inbox Handoff desktop bridge on this computer. The bridge
-      gives them to your own Claude Code, which sends them to Anthropic's API to prepare a plan. Claude only reads your
-      project while planning. Nothing is changed until you approve a specific plan.
+    <h1>Review before creating a task</h1>
+    <p class="notice" id="what-happens">
+      Nothing has been sent anywhere. Creating the task saves the email text shown below, its subject, sender, date,
+      Gmail link and your notes <strong>in this browser only</strong>. On the next page you can copy a task brief and
+      open Claude yourself. Only what you paste into Claude leaves your browser.
     </p>
 
     <div id="status" role="status" aria-live="polite"></div>
+    <p id="duplicate-warning" class="warn" hidden></p>
 
     <form id="form" hidden>
       <fieldset>
-        <legend>What to send</legend>
+        <legend>What to include</legend>
         <label><input type="radio" name="scope" value="message" checked> One message</label>
         <label><input type="radio" name="scope" value="thread"> <span id="thread-label">Whole conversation</span></label>
         <p id="collapsed-note" class="warn" hidden></p>
@@ -34,12 +34,12 @@
 
       <fieldset>
         <legend>Task</legend>
-        <label for="project">Project</label>
-        <select id="project" required disabled><option value="">Loading…</option></select>
-        <p id="project-note" class="hint"></p>
-
         <label for="title">Title</label>
         <input id="title" maxlength="300" required>
+
+        <label for="repository">Repository URL or project name (optional)</label>
+        <input id="repository" maxlength="500" placeholder="https://github.com/owner/repo" autocomplete="off">
+        <p class="hint">Used only as text in the brief. The extension can't open or inspect repositories.</p>
 
         <label for="instructions">Instructions for Claude (optional)</label>
         <textarea id="instructions" rows="4" maxlength="20000"></textarea>
@@ -62,15 +62,16 @@
       </fieldset>
 
       <details id="payload-details">
-        <summary>Exactly what will be sent</summary>
+        <summary>Exactly what will be saved</summary>
         <pre id="payload" tabindex="0"></pre>
       </details>
 
       <div class="actions">
-        <button type="submit" id="send" disabled>Send to Claude</button>
+        <button type="submit" id="create" disabled>Create task</button>
         <button type="button" id="cancel" class="secondary">Cancel</button>
       </div>
     </form>
+    <p id="next" hidden><a id="open-task" href="#">Open the task</a></p>
   </main>
   <script type="module" src="./main.ts"></script>
 </body>

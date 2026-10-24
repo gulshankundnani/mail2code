@@ -1,4 +1,5 @@
-import { CapturedConversationSchema, LIMITS, type CapturedConversation, type CapturedMessage } from "@inbox-handoff/protocol";
+import type { CapturedConversation, CapturedMessage } from "@inbox-handoff/protocol";
+import { LIMITS } from "@inbox-handoff/protocol/limits";
 import { SELECTORS, isHidden, queryAllFirstMatching, queryFirst } from "./selectors.ts";
 import { elementToText } from "./text.ts";
 
@@ -106,15 +107,20 @@ export function extractConversation(doc: Document, href: string, now: Date = new
   if (messages.length === 0) return { ok: false, error: "no_expanded_messages" };
   if (messages.length > LIMITS.maxMessagesPerHandoff) return { ok: false, error: "too_many_messages" };
 
-  const parsed = CapturedConversationSchema.safeParse({
-    threadId,
-    threadUrl,
-    subject: (conv.subject.textContent ?? "").trim().slice(0, LIMITS.maxSubjectChars),
-    messages,
-    collapsedCount: collapsed,
-    capturedAt: now.toISOString(),
-  });
-  return parsed.success ? { ok: true, value: parsed.data } : { ok: false, error: "message_not_identified", detail: parsed.error.message };
+  // Every field is bounded above, so no schema library is bundled into the
+  // content script. The background script re-validates the whole capture
+  // with CapturedConversationSchema before storing anything.
+  return {
+    ok: true,
+    value: {
+      threadId,
+      threadUrl,
+      subject: (conv.subject.textContent ?? "").trim().slice(0, LIMITS.maxSubjectChars),
+      messages,
+      collapsedCount: collapsed,
+      capturedAt: now.toISOString(),
+    },
+  };
 }
 
 export const EXTRACT_ERROR_TEXT: Record<ExtractError, string> = {

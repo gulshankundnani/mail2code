@@ -3,36 +3,64 @@
 Status is evidence-based. "Tested" means an automated or manual run actually
 happened on the stated version; everything else is "planned" or "built".
 
-## Extension (Phase 2c scope: button, extraction, review page)
+## Extension (Phase 2: capture, review, task page, recorded approval)
 
 | Browser | Status | Evidence |
 |---|---|---|
-| Chromium (Playwright build 156.0.8078.x) on Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 9/9 passing, 2026-10-24 |
-| Microsoft Edge 155.0.4283.62 on Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 9/9 passing (installed Edge, headless), 2026-10-24 |
-| Google Chrome 156 (branded) | Built, not automated | Branded Chrome no longer honours `--load-extension`, so automation uses Playwright's Chromium. Manual unpacked load not yet done |
-| Brave | Planned (Phase 6) | — |
-| Firefox | Planned (Phase 6) | — |
-| Safari | Deferred (decision D6) | — |
-| macOS, Linux (any browser) | Planned (Phase 6) | No hardware or CI run yet |
+| Chromium (Playwright build 156.0.8078.x), Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 10/10 passing, 2026-10-24 |
+| Microsoft Edge 155.0.4283.62, Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 10/10 passing (installed Edge, headless), 2026-10-24 |
+| Google Chrome 156 (branded) | Built, not automated | Branded Chrome no longer honours `--load-extension`; automation uses Playwright's Chromium. Manual unpacked load not yet done |
+| Brave | Planned (Phase 5) | Not installed on the dev machine |
+| Firefox | Planned (Phase 5) | Not installed on the dev machine |
+| Safari | Deferred (decision D7) | Needs macOS + Xcode |
+| macOS, Linux (any browser) | Planned | No hardware or CI run yet |
+
+## What the automated tests cover
+
+Gmail button (presence, no duplicates, SPA navigation, ambiguous pages,
+unidentifiable messages, keyboard), message vs. thread capture, hostile email
+rendered as inert text, review page payload, task creation and duplicate
+detection, brief copied to the clipboard, "Open Claude" URL (no task content in
+it), user-reported submission, plan recording, approval, refusal of an approval
+from a tab showing an older plan, user-reported start, task list, and the
+honest integration-status panel.
+
+### Network isolation in tests
+
+The test browser runs with `--host-resolver-rules=MAP * ~NOTFOUND`, so no
+hostname resolves and nothing can reach the internet. Synthetic Gmail is served
+by Playwright's request routing. Tabs opened by the extension itself
+(`tabs.create`) are not intercepted by routing, so those tests assert the URL
+the extension requested instead of loading a page.
+
+> Before this kill switch was added (2026-10-24), a few test runs opened the
+> real `https://claude.ai/code` and `https://claude.ai/new` with plain GET
+> requests (no task content in the URL, no account, no email data).
 
 ## Important limitation: synthetic Gmail only
 
-All automated tests run against hand-written fixtures in
-`fixtures/synthetic-gmail/` served at `https://mail.google.com/` by Playwright.
+All automated tests use hand-written fixtures in `fixtures/synthetic-gmail/`.
 Gmail's real DOM is undocumented and may differ. **Compatibility with live
-Gmail has not been verified.** Before it is claimed, someone must manually:
+Gmail has not been verified.** Manual check:
 
-1. Load `apps/extension/dist/chrome-mv3` (or `edge-mv3`) as an unpacked
-   extension.
-2. Open a real conversation in Gmail and confirm the button appears once, next
-   to the subject.
-3. Click it and check the review page shows the right subject, sender, date and
-   text for the current message and for the whole conversation.
-4. Navigate between conversations and back to the inbox and confirm the button
-   follows correctly.
+1. Load `apps/extension/dist/chrome-mv3` (or `edge-mv3`) unpacked.
+2. Open a real conversation; confirm one **Send to Claude** button next to the subject.
+3. Click it; check subject, sender, date and text for one message and for the whole conversation.
+4. Navigate between conversations and the inbox; confirm the button follows correctly.
 
-Selector strategies live in `packages/gmail-extract/src/selectors.ts`; a Gmail
-change should only need edits there plus a new fixture.
+## Bundle size (production Chrome build, 2026-10-24)
+
+| File | Raw | gzip | Loaded when |
+|---|---|---|---|
+| `content-scripts/gmail.js` | 11.1 kB | 4.4 kB | On every Gmail page |
+| `background.js` | 91.4 kB | 26.1 kB | Service worker, on demand |
+| shared page chunk (`ui-*.js`) | 98.8 kB | 28.5 kB | Extension pages only |
+| task / review / options pages | 7.8 / 4.1 / 1.8 kB | 3.3 / 1.9 / 1.0 kB | Extension pages only |
+| **Whole extension** | **228.5 kB** | — | — |
+
+Most of the background and page code is the zod validation library. The Gmail
+content script deliberately does not include it (the background re-validates
+every capture). Switching to `zod/mini` is a possible later reduction.
 
 ## Loading the unpacked extension (development)
 
@@ -40,10 +68,5 @@ change should only need edits there plus a new fixture.
 npm run -w @inbox-handoff/extension build:all
 ```
 
-- Chrome: `chrome://extensions` → Developer mode → Load unpacked →
-  `apps/extension/dist/chrome-mv3`
-- Edge: `edge://extensions` → Developer mode → Load unpacked →
-  `apps/extension/dist/edge-mv3`
-
-Until the desktop bridge exists (Phase 2d), the review page works but sending
-is disabled.
+- Chrome: `chrome://extensions` → Developer mode → Load unpacked → `apps/extension/dist/chrome-mv3`
+- Edge: `edge://extensions` → Developer mode → Load unpacked → `apps/extension/dist/edge-mv3`

@@ -1,5 +1,4 @@
-// Hard limits shared by the extension and the bridge. Chrome caps host->browser
-// native messages at 1 MB, so anything the bridge sends must stay well below it.
+// Hard limits shared across the extension.
 export const LIMITS = {
   maxMessagesPerHandoff: 50,
   maxMessageBodyChars: 200_000,
@@ -7,6 +6,7 @@ export const LIMITS = {
   maxInstructionsChars: 20_000,
   maxSubjectChars: 1_000,
   maxTitleChars: 300,
+  maxRepositoryRefChars: 500,
   maxPlanChars: 200_000,
-  maxHostToBrowserBytes: 900_000,
+  maxNoteChars: 5_000,
 } as const;

@@ -13,8 +13,8 @@ export function canonicalJson(value: unknown): string {
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
 }
 
-// Input to the handoff idempotency key: the same messages sent to the same
-// project with the same instructions are treated as a duplicate.
-export function idempotencyMaterial(h: { threadId: string; messageIds: string[]; projectId: string; instructions: string }): string {
+// Input to the duplicate-task key: the same messages for the same repository
+// with the same instructions are treated as a duplicate.
+export function idempotencyMaterial(h: { threadId: string; messageIds: string[]; repositoryRef: string; instructions: string }): string {
   return canonicalJson({ domain: "inbox-handoff/handoff/v1", ...h, messageIds: [...h.messageIds].sort() });
 }

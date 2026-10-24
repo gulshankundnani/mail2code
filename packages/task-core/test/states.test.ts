@@ -1,19 +1,20 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { TASK_STATUSES, type TaskStatus } from "@inbox-handoff/protocol";
-import { IllegalTransitionError, assertTransition, canTransition, type TransitionCause } from "../src/index.ts";
+import { IllegalTransitionError, STATUS_LABELS, assertTransition, canTransition, type TransitionCause } from "../src/index.ts";
 
-const CAUSES: TransitionCause[] = ["user_action", "user_approval", "planner", "executor", "system_recovery", "context_refresh"];
+const CAUSES: TransitionCause[] = ["user_action", "user_approval", "system"];
 
 describe("state machine", () => {
-  it("allows the happy path", () => {
+  it("allows the browser-handoff path", () => {
     const path: [TaskStatus, TransitionCause][] = [
-      ["ReadyForPlanning", "user_action"],
-      ["Planning", "planner"],
-      ["AwaitingApproval", "planner"],
+      ["ReadyForHandoff", "user_action"],
+      ["HandoffOpened", "user_action"],
+      ["Planning", "user_action"],
+      ["AwaitingApproval", "user_action"],
       ["Approved", "user_approval"],
-      ["InProgress", "executor"],
-      ["Completed", "executor"],
+      ["InProgress", "user_action"],
+      ["Completed", "user_action"],
     ];
     let s: TaskStatus = "Captured";
     for (const [to, cause] of path) {
@@ -22,46 +23,44 @@ describe("state machine", () => {
     }
   });
 
-  it("only user_approval can reach Approved, and only from AwaitingApproval", () => {
+  it("only user_approval reaches Approved, and only from AwaitingApproval", () => {
     for (const from of TASK_STATUSES)
-      for (const cause of CAUSES)
-        expect(canTransition(from, "Approved", cause)).toBe(from === "AwaitingApproval" && cause === "user_approval");
+      for (const cause of CAUSES) expect(canTransition(from, "Approved", cause)).toBe(from === "AwaitingApproval" && cause === "user_approval");
   });
 
-  it("only the executor can reach InProgress, and only from Approved", () => {
-    for (const from of TASK_STATUSES)
-      for (const cause of CAUSES) expect(canTransition(from, "InProgress", cause)).toBe(from === "Approved" && cause === "executor");
+  it("InProgress is reachable only from Approved", () => {
+    for (const from of TASK_STATUSES) for (const cause of CAUSES) if (canTransition(from, "InProgress", cause)) expect(from).toBe("Approved");
   });
 
-  it("background causes never move a task toward execution", () => {
+  it("system causes (import, recovery) can only block", () => {
     for (const from of TASK_STATUSES)
-      for (const cause of ["system_recovery", "context_refresh"] as const) {
-        expect(canTransition(from, "Approved", cause)).toBe(false);
-        expect(canTransition(from, "InProgress", cause)).toBe(false);
-      }
+      for (const to of TASK_STATUSES) if (canTransition(from, to, "system")) expect(to).toBe("Blocked");
   });
 
-  it("blocked tasks must go back through review", () => {
-    expect(canTransition("Blocked", "InProgress", "executor")).toBe(false);
+  it("blocked tasks go back through review", () => {
+    expect(canTransition("Blocked", "InProgress", "user_action")).toBe(false);
     expect(canTransition("Blocked", "Approved", "user_approval")).toBe(false);
-    expect(canTransition("Blocked", "AwaitingApproval", "user_action")).toBe(true);
   });
 
   it("throws a typed error on illegal transitions", () => {
-    expect(() => assertTransition("Captured", "InProgress", "executor")).toThrow(IllegalTransitionError);
+    expect(() => assertTransition("Captured", "InProgress", "user_action")).toThrow(IllegalTransitionError);
   });
 
-  it("property: no event sequence reaches InProgress without passing user_approval then executor", () => {
+  it("labels user-reported states honestly", () => {
+    expect(STATUS_LABELS.InProgress).toMatch(/reported by you, not verified/);
+    expect(STATUS_LABELS.Completed).toMatch(/reported by you/);
+  });
+
+  it("property: no event sequence reaches InProgress without an approval immediately before", () => {
     const step = fc.record({ to: fc.constantFrom(...TASK_STATUSES), cause: fc.constantFrom(...CAUSES) });
     fc.assert(
       fc.property(fc.array(step, { maxLength: 60 }), (steps) => {
         let s: TaskStatus = "Captured";
-        let approvedByUser = false;
+        let approved = false;
         for (const { to, cause } of steps) {
           if (!canTransition(s, to, cause)) continue;
-          if (to === "Approved") approvedByUser = cause === "user_approval";
-          else if (to !== "InProgress") approvedByUser = false;
-          if (to === "InProgress" && !(approvedByUser && s === "Approved" && cause === "executor")) return false;
+          if (to === "InProgress" && !(approved && s === "Approved")) return false;
+          approved = to === "Approved" ? cause === "user_approval" : to === "InProgress" ? approved : false;
           s = to;
         }
         return true;

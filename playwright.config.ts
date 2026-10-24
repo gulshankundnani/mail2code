@@ -9,13 +9,7 @@ export default defineConfig<ExtensionOptions>({
   timeout: 30_000,
   reporter: [["list"]],
   projects: [
-    {
-      name: "chromium",
-      use: { browserChannel: "chromium", e2eBuild: "apps/extension/dist/chrome-mv3-e2e", prodBuild: "apps/extension/dist/chrome-mv3" },
-    },
-    {
-      name: "msedge",
-      use: { browserChannel: "msedge", e2eBuild: "apps/extension/dist/edge-mv3-e2e", prodBuild: "apps/extension/dist/edge-mv3" },
-    },
+    { name: "chromium", use: { browserChannel: "chromium", extensionBuild: "apps/extension/dist/chrome-mv3" } },
+    { name: "msedge", use: { browserChannel: "msedge", extensionBuild: "apps/extension/dist/edge-mv3" } },
   ],
 });

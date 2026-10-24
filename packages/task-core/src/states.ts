@@ -1,52 +1,32 @@
 import type { TaskStatus } from "@inbox-handoff/protocol";
 
-// Who or what is asking for a transition. Background causes (recovery, import,
-// context refresh) must never be able to move a task toward execution.
-export type TransitionCause =
-  | "user_action"
-  | "user_approval"
-  | "planner"
-  | "executor"
-  | "system_recovery"
-  | "context_refresh";
-
-const BACKGROUND: readonly TransitionCause[] = ["system_recovery", "context_refresh"];
+// Who is asking for a transition. With the browser handoff the extension cannot
+// observe the remote Claude session, so every step past "HandoffOpened" is
+// something the *user* reports. `system` covers import and recovery, and may
+// only ever block a task.
+export type TransitionCause = "user_action" | "user_approval" | "system";
 
 type Edges = Partial<Record<TaskStatus, readonly TransitionCause[]>>;
 
 // from -> to -> causes allowed to take that edge. Anything absent is illegal.
 const TRANSITIONS: Record<TaskStatus, Edges> = {
-  Captured: { ReadyForPlanning: ["user_action"], Cancelled: ["user_action"] },
-  ReadyForPlanning: { Planning: ["planner"], Cancelled: ["user_action"] },
-  Planning: {
-    AwaitingApproval: ["planner"],
-    Failed: ["planner", "system_recovery"],
-    Blocked: ["planner", "system_recovery"],
-    Cancelled: ["user_action"],
-  },
+  Captured: { ReadyForHandoff: ["user_action"], Cancelled: ["user_action"] },
+  ReadyForHandoff: { HandoffOpened: ["user_action"], Cancelled: ["user_action"] },
+  HandoffOpened: { Planning: ["user_action"], ReadyForHandoff: ["user_action"], Cancelled: ["user_action"] },
+  Planning: { AwaitingApproval: ["user_action"], Failed: ["user_action"], Blocked: ["user_action", "system"], Cancelled: ["user_action"] },
   AwaitingApproval: {
     Approved: ["user_approval"],
     Rejected: ["user_approval"],
-    ReadyForPlanning: ["user_approval"], // "request changes" triggers a new plan version
-    Blocked: ["context_refresh", "system_recovery"],
+    Planning: ["user_approval"], // "request changes": a revised plan is needed
+    Blocked: ["system"],
     Cancelled: ["user_action"],
   },
-  Approved: {
-    InProgress: ["executor"],
-    Blocked: ["executor", "system_recovery", "context_refresh"],
-    Cancelled: ["user_action"],
-  },
-  InProgress: {
-    Completed: ["executor"],
-    Failed: ["executor", "system_recovery"],
-    Blocked: ["executor", "system_recovery", "context_refresh"],
-    Cancelled: ["user_action"],
-  },
-  // Leaving Blocked always goes back through review: a blocked task can never
-  // resume execution without a fresh approval.
-  Blocked: { AwaitingApproval: ["user_action"], ReadyForPlanning: ["user_action"], Cancelled: ["user_action"] },
-  Failed: { ReadyForPlanning: ["user_action"] },
-  Rejected: { ReadyForPlanning: ["user_action"] },
+  Approved: { InProgress: ["user_action"], Blocked: ["user_action", "system"], Cancelled: ["user_action"] },
+  InProgress: { Completed: ["user_action"], Failed: ["user_action"], Blocked: ["user_action", "system"], Cancelled: ["user_action"] },
+  // Leaving Blocked always goes back through review: never straight to work.
+  Blocked: { Planning: ["user_action"], AwaitingApproval: ["user_action"], Cancelled: ["user_action"] },
+  Failed: { ReadyForHandoff: ["user_action"] },
+  Rejected: { ReadyForHandoff: ["user_action"] },
   Completed: {},
   Cancelled: {},
 };
@@ -65,11 +45,10 @@ export class IllegalTransitionError extends Error {
 }
 
 export function canTransition(from: TaskStatus, to: TaskStatus, cause: TransitionCause): boolean {
-  const causes = TRANSITIONS[from][to];
-  if (!causes?.includes(cause)) return false;
+  if (!TRANSITIONS[from][to]?.includes(cause)) return false;
   // Defence in depth against a future edit to the table above.
-  if (BACKGROUND.includes(cause) && (to === "Approved" || to === "InProgress")) return false;
-  if (to === "Approved" && cause !== "user_approval") return false;
+  if (cause === "system" && to !== "Blocked") return false;
+  if (to === "Approved" && (cause !== "user_approval" || from !== "AwaitingApproval")) return false;
   if (to === "InProgress" && from !== "Approved") return false;
   return true;
 }
@@ -78,6 +57,23 @@ export function assertTransition(from: TaskStatus, to: TaskStatus, cause: Transi
   if (!canTransition(from, to, cause)) throw new IllegalTransitionError(from, to, cause);
 }
 
-export function allowedTargets(from: TaskStatus): TaskStatus[] {
-  return Object.keys(TRANSITIONS[from]) as TaskStatus[];
+export function allowedTargets(from: TaskStatus, cause: TransitionCause): TaskStatus[] {
+  return (Object.keys(TRANSITIONS[from]) as TaskStatus[]).filter((to) => canTransition(from, to, cause));
 }
+
+// User-facing wording. States after the handoff are labelled as user-reported,
+// because the extension cannot verify them.
+export const STATUS_LABELS: Record<TaskStatus, string> = {
+  Captured: "Captured",
+  ReadyForHandoff: "Brief ready",
+  HandoffOpened: "Handoff opened",
+  Planning: "Submitted to Claude (reported by you)",
+  AwaitingApproval: "Plan recorded, awaiting your approval",
+  Approved: "Approved by you",
+  InProgress: "Implementation started (reported by you, not verified)",
+  Blocked: "Blocked",
+  Completed: "Completed (reported by you)",
+  Rejected: "Plan rejected",
+  Cancelled: "Cancelled",
+  Failed: "Failed",
+};

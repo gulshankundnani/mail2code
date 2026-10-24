@@ -1,14 +1,12 @@
-import { createHash } from "node:crypto";
-import { canonicalJson, type PlanContent } from "@inbox-handoff/protocol";
+import { canonicalJson } from "@inbox-handoff/protocol";
 
-export { canonicalJson };
-
-export function sha256Hex(data: string): string {
-  return createHash("sha256").update(data, "utf8").digest("hex");
+export async function sha256Hex(data: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// The hash binds the plan to its task, project and version, so an approval for
-// one task's plan can never match another task or a later revision.
-export function planHash(input: { taskId: string; projectId: string; version: number; content: PlanContent }): string {
+// Binds a plan to its task and version, so an approval for one task's plan
+// can never match another task or a later revision.
+export function planHash(input: { taskId: string; version: number; text: string }): Promise<string> {
   return sha256Hex(canonicalJson({ domain: "inbox-handoff/plan/v1", ...input }));
 }

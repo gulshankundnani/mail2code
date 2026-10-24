@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CapturedConversation } from "@inbox-handoff/protocol";
-import { createFakeBridge, createUnavailableBridge } from "../src/bridge.ts";
 import { createDraftStore, DRAFT_TTL_MS } from "../src/drafts.ts";
-import { buildHandoff, type ReviewForm } from "../src/handoff.ts";
+import { buildTaskCreate, type ReviewForm } from "../src/handoff.ts";
 import { routeMessage, type RouterDeps } from "../src/router.ts";
 import { classifySender } from "../src/sender.ts";
 
@@ -24,7 +23,7 @@ const conversation: CapturedConversation = {
 const form = (over: Partial<ReviewForm> = {}): ReviewForm => ({
   scope: "message",
   selectedMessageId: "msg-f:2",
-  projectId: "proj_e2e",
+  repositoryRef: "",
   title: "",
   instructions: "",
   priority: "normal",
@@ -35,25 +34,21 @@ const form = (over: Partial<ReviewForm> = {}): ReviewForm => ({
 function memoryKv() {
   const m = new Map<string, unknown>();
   return {
-    m,
     get: async (k: string) => (m.has(k) ? { [k]: m.get(k) } : {}),
     set: async (items: Record<string, unknown>) => void Object.entries(items).forEach(([k, v]) => m.set(k, v)),
     remove: async (k: string | string[]) => void [k].flat().forEach((x) => m.delete(x)),
   };
 }
 
-function deps(bridge = createFakeBridge()) {
+function deps() {
   const opened: string[] = [];
-  const d: RouterDeps = { drafts: createDraftStore(memoryKv()), bridge, openReview: async (id) => void opened.push(id) };
-  return { d, opened, bridge };
+  const d: RouterDeps = { drafts: createDraftStore(memoryKv()), openReview: async (id) => void opened.push(id) };
+  return { d, opened };
 }
 
 describe("classifySender", () => {
-  it("recognises the extension's own pages", () => {
+  it("recognises the extension's own pages and the top-frame Gmail content script", () => {
     expect(classifySender({ id: ID, url: `${ORIGIN}review.html?draft=x`, tab: {}, frameId: 0 }, ID, ORIGIN)).toBe("extension-page");
-  });
-
-  it("recognises the top-frame Gmail content script", () => {
     expect(classifySender({ id: ID, url: "https://mail.google.com/mail/u/0/#inbox", tab: {}, frameId: 0 }, ID, ORIGIN)).toBe("gmail-content-script");
   });
 
@@ -68,20 +63,17 @@ describe("classifySender", () => {
 describe("routeMessage", () => {
   it("lets Gmail capture a draft and open the review page", async () => {
     const { d, opened } = deps();
-    const r = await routeMessage({ kind: "capture", conversation }, "gmail-content-script", d);
-    expect(r.ok).toBe(true);
+    expect((await routeMessage({ kind: "capture", conversation }, "gmail-content-script", d)).ok).toBe(true);
     expect(opened).toHaveLength(1);
   });
 
-  it("never lets the Gmail page submit a handoff, list projects or read drafts", async () => {
-    const { d, bridge } = deps();
+  it("never lets the Gmail page read or discard drafts", async () => {
+    const { d } = deps();
     const draftId = await d.drafts.put(conversation);
-    const built = await buildHandoff(conversation, form());
-    if (!built.ok) throw new Error(built.error);
-    for (const msg of [{ kind: "handoff.submit", draftId, handoff: built.handoff }, { kind: "projects.list" }, { kind: "draft.get", draftId }]) {
+    for (const msg of [{ kind: "draft.get", draftId }, { kind: "draft.discard", draftId }]) {
       expect(await routeMessage(msg, "gmail-content-script", d)).toEqual({ ok: false, error: "invalid_message" });
     }
-    expect(bridge.received).toHaveLength(0);
+    expect(await d.drafts.get(draftId)).not.toBeNull();
   });
 
   it("ignores untrusted senders entirely", async () => {
@@ -90,64 +82,36 @@ describe("routeMessage", () => {
     expect(opened).toHaveLength(0);
   });
 
-  it("submits a handoff built from the captured draft and deletes the draft", async () => {
-    const { d, bridge } = deps();
+  it("lets extension pages read and discard drafts", async () => {
+    const { d } = deps();
     const draftId = await d.drafts.put(conversation);
-    const built = await buildHandoff(conversation, form());
-    if (!built.ok) throw new Error(built.error);
-    expect(await routeMessage({ kind: "handoff.submit", draftId, handoff: built.handoff }, "extension-page", d)).toEqual({
-      ok: true,
-      value: { taskId: "fake-task-1", created: true },
-    });
-    expect(bridge.received[0]!.messages.map((m) => m.messageId)).toEqual(["msg-f:2"]);
+    expect((await routeMessage({ kind: "draft.get", draftId }, "extension-page", d)).ok).toBe(true);
+    await routeMessage({ kind: "draft.discard", draftId }, "extension-page", d);
     expect(await d.drafts.get(draftId)).toBeNull();
-  });
-
-  it("rejects a handoff whose content differs from what was captured", async () => {
-    const { d, bridge } = deps();
-    const draftId = await d.drafts.put(conversation);
-    const built = await buildHandoff(conversation, form());
-    if (!built.ok) throw new Error(built.error);
-    const forged = { ...built.handoff, messages: [{ ...built.handoff.messages[0]!, bodyText: "injected" }] };
-    expect(await routeMessage({ kind: "handoff.submit", draftId, handoff: forged }, "extension-page", d)).toEqual({
-      ok: false,
-      error: "handoff_does_not_match_capture",
-    });
-    expect(bridge.received).toHaveLength(0);
-  });
-
-  it("reports the bridge as unavailable in production builds", async () => {
-    const { d } = deps(createUnavailableBridge() as ReturnType<typeof createFakeBridge>);
-    expect(await routeMessage({ kind: "projects.list" }, "extension-page", d)).toEqual({ ok: false, error: "bridge_not_connected" });
   });
 });
 
-describe("buildHandoff", () => {
+describe("buildTaskCreate", () => {
   it("defaults the title to the subject and uses only the chosen message", async () => {
-    const r = await buildHandoff(conversation, form());
-    expect(r.ok && r.handoff.title).toBe("Fix login");
-    expect(r.ok && r.handoff.messages).toHaveLength(1);
+    const r = await buildTaskCreate(conversation, form());
+    expect(r.ok && r.task.title).toBe("Fix login");
+    expect(r.ok && r.task.messages.map((m) => m.messageId)).toEqual(["msg-f:2"]);
   });
 
   it("includes every captured message for thread scope", async () => {
-    const r = await buildHandoff(conversation, form({ scope: "thread" }));
-    expect(r.ok && r.handoff.messages.map((m) => m.messageId)).toEqual(["msg-f:1", "msg-f:2"]);
+    const r = await buildTaskCreate(conversation, form({ scope: "thread" }));
+    expect(r.ok && r.task.messages).toHaveLength(2);
   });
 
-  it("produces a stable idempotency key that changes with instructions or project", async () => {
+  it("produces a stable duplicate key that changes with instructions or repository", async () => {
     const key = async (f: ReviewForm) => {
-      const r = await buildHandoff(conversation, f);
-      return r.ok ? r.handoff.idempotencyKey : null;
+      const r = await buildTaskCreate(conversation, f);
+      return r.ok ? r.task.idempotencyKey : null;
     };
     const base = await key(form());
     expect(await key(form())).toBe(base);
     expect(await key(form({ instructions: "also add tests" }))).not.toBe(base);
-    expect(await key(form({ projectId: "proj_other" }))).not.toBe(base);
-    expect(base).toMatch(/^[a-f0-9]{64}$/);
-  });
-
-  it("refuses to build without a project", async () => {
-    expect(await buildHandoff(conversation, form({ projectId: "" }))).toEqual({ ok: false, error: "Choose a project." });
+    expect(await key(form({ repositoryRef: "https://github.com/example/app" }))).not.toBe(base);
   });
 });
 

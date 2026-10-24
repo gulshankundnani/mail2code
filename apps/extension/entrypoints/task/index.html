@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task – Inbox Handoff</title>
+  <link rel="stylesheet" href="../../assets/common.css">
+</head>
+<body>
+  <main>
+    <p><a id="all-tasks" href="#">← All tasks</a></p>
+    <h1 id="title">Task</h1>
+    <p><span class="badge" id="status-label"></span> <span id="block-reason" class="warn"></span></p>
+    <dl class="facts">
+      <dt>Source</dt><dd><a id="source-link" target="_blank" rel="noopener noreferrer">Open in Gmail</a> · <span id="source-count"></span></dd>
+      <dt>Repository</dt><dd id="repository"></dd>
+      <dt>Priority</dt><dd id="priority"></dd>
+      <dt>Due</dt><dd id="due"></dd>
+      <dt>Created</dt><dd id="created"></dd>
+    </dl>
+
+    <div id="status" role="status" aria-live="polite"></div>
+
+    <section id="step-handoff" aria-labelledby="h-handoff">
+      <h2 id="h-handoff">1. Hand off to Claude</h2>
+      <p class="notice" id="transfer-notice">
+        <strong>Copy brief</strong> puts the brief below on your clipboard, including the email text. Nothing is sent
+        until you paste it into Claude yourself. Then it goes to Anthropic and is handled under your Claude account.
+        This extension can't detect or start Claude Code on your computer. You can paste the brief there instead.
+      </p>
+      <details>
+        <summary>Brief that will be copied</summary>
+        <pre id="brief" tabindex="0"></pre>
+      </details>
+      <div class="actions">
+        <button type="button" id="copy-brief">Copy brief</button>
+        <button type="button" id="open-claude" class="secondary" disabled>Open Claude</button>
+        <button type="button" id="mark-submitted" class="secondary" disabled>I've sent it to Claude</button>
+      </div>
+      <p class="hint" id="destination-hint"></p>
+    </section>
+
+    <section id="step-plan" aria-labelledby="h-plan">
+      <h2 id="h-plan">2. Record Claude's plan</h2>
+      <p class="hint">Paste the plan Claude proposed. Recording a new or changed plan cancels any earlier approval.</p>
+      <label for="plan-text">Plan</label>
+      <textarea id="plan-text" rows="8" maxlength="200000"></textarea>
+      <div class="actions"><button type="button" id="record-plan" disabled>Record plan</button></div>
+    </section>
+
+    <section id="step-approve" aria-labelledby="h-approve">
+      <h2 id="h-approve">3. Approve or reject the plan</h2>
+      <p class="notice warn-box" id="enforcement-notice">
+        Your decision is recorded here, tied to this exact plan version. The extension <strong>can't stop</strong> Claude
+        in claude.ai from acting before you approve, and can't see what it does. After deciding, tell Claude yourself.
+      </p>
+      <div id="current-plan" hidden>
+        <p class="meta" id="plan-meta"></p>
+        <pre id="plan-view" tabindex="0"></pre>
+        <label for="decision-comment">Comment (optional)</label>
+        <input id="decision-comment" maxlength="5000">
+        <div class="actions">
+          <button type="button" id="approve" disabled>Approve this plan</button>
+          <button type="button" id="request-changes" class="secondary" disabled>Request changes</button>
+          <button type="button" id="reject" class="secondary" disabled>Reject</button>
+        </div>
+        <div class="actions"><button type="button" id="copy-approval" class="secondary" hidden>Copy approval message for Claude</button></div>
+      </div>
+      <p class="hint" id="no-plan">No plan recorded yet.</p>
+    </section>
+
+    <section id="step-progress" aria-labelledby="h-progress">
+      <h2 id="h-progress">4. Progress (reported by you)</h2>
+      <p class="hint">The extension can't observe implementation. These buttons record what you tell it.</p>
+      <div class="actions">
+        <button type="button" id="report-started" class="secondary" disabled>Implementation started</button>
+        <button type="button" id="report-completed" class="secondary" disabled>Completed</button>
+        <button type="button" id="report-failed" class="secondary" disabled>Failed</button>
+        <button type="button" id="block" class="secondary" disabled>Block</button>
+        <button type="button" id="unblock" class="secondary" disabled>Back to review</button>
+        <button type="button" id="cancel-task" class="secondary danger" disabled>Cancel task</button>
+      </div>
+      <label for="note">Add a progress note</label>
+      <div class="row"><input id="note" maxlength="5000"><button type="button" id="add-note" class="secondary">Add note</button></div>
+    </section>
+
+    <section aria-labelledby="h-history">
+      <h2 id="h-history">History</h2>
+      <ol id="history" class="history"></ol>
+    </section>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

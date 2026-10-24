@@ -52,3 +52,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #status { min-height: 1.5em; margin: 12px 0; }
 #status[data-tone=error] { color: var(--error); }
 #status[data-tone=success] { font-weight: 600; }
+a { color: var(--accent); }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); }
+.badge[data-status=AwaitingApproval], .badge[data-status=Blocked] { border-color: var(--warn); color: var(--warn); }
+.badge[data-status=Approved], .badge[data-status=Completed] { border-color: var(--accent); color: var(--accent); }
+.badge[data-status=Failed], .badge[data-status=Rejected], .badge[data-status=Cancelled] { color: var(--muted); }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+section { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 4px; }
+.warn-box { border-color: var(--warn); }
+.meta { font-size: 13px; color: var(--muted); }
+.history, .task-list, .integrations { padding-left: 20px; }
+.history li, .task-list li, .integrations li { margin-bottom: 8px; overflow-wrap: anywhere; }
+.row > button { flex: 0 0 auto; }
+button.danger { color: var(--error); border-color: var(--error); }
+pre#brief, pre#plan-view { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-height: 360px; overflow: auto; font: 13px/1.45 ui-monospace, monospace; }

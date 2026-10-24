@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { CapturedConversationSchema, HandoffCreateSchema } from "@inbox-handoff/protocol";
+import { CapturedConversationSchema } from "@inbox-handoff/protocol";
 
-// Messages inside the extension (content script / pages -> background).
+// Runtime messages to the background script. Tasks themselves live in the
+// extension's IndexedDB, which Gmail's content script cannot reach at all.
 
 export const GmailMessageSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("capture"), conversation: CapturedConversationSchema }),
@@ -10,8 +11,6 @@ export const GmailMessageSchema = z.discriminatedUnion("kind", [
 export const PageMessageSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("draft.get"), draftId: z.string().uuid() }),
   z.object({ kind: z.literal("draft.discard"), draftId: z.string().uuid() }),
-  z.object({ kind: z.literal("projects.list") }),
-  z.object({ kind: z.literal("handoff.submit"), draftId: z.string().uuid(), handoff: HandoffCreateSchema }),
 ]);
 
 export type GmailMessage = z.infer<typeof GmailMessageSchema>;

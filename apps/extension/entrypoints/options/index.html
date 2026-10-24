@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="manifest.open_in_tab" content="true">
+  <title>Tasks – Inbox Handoff</title>
+  <link rel="stylesheet" href="../../assets/common.css">
+</head>
+<body>
+  <main>
+    <h1>Inbox Handoff tasks</h1>
+    <div id="status" role="status" aria-live="polite"></div>
+    <section aria-labelledby="h-tasks">
+      <h2 id="h-tasks">Your tasks</h2>
+      <p id="empty" class="hint" hidden>No tasks yet. Open an email in Gmail and click <strong>Send to Claude</strong>.</p>
+      <ul id="tasks" class="task-list"></ul>
+    </section>
+    <section aria-labelledby="h-integrations">
+      <h2 id="h-integrations">What this extension can reach</h2>
+      <ul id="integrations" class="integrations"></ul>
+    </section>
+    <p class="hint">Tasks are stored only in this browser. Nothing is sent anywhere unless you paste it yourself.</p>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

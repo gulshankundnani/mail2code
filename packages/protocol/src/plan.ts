@@ -1,27 +1,23 @@
 import { z } from "zod";
+import { LIMITS } from "./limits.ts";
 
-const text = (max: number) => z.string().trim().min(1).max(max);
+// What the brief asks Claude to cover before any implementation.
+export const PLAN_SECTIONS = [
+  "Objective",
+  "Assumptions",
+  "Unanswered questions",
+  "Proposed steps",
+  "Files or components expected to change",
+  "Commands and tools you would run",
+  "Tests",
+  "Risks",
+  "External dependencies",
+] as const;
 
-export const PlanCommandSchema = z.object({
-  // Exact command line Claude intends to run. Approval covers these strings only.
-  command: text(2_000),
-  purpose: text(2_000),
+// A plan as recorded in the extension. With the browser handoff the user
+// pastes it in; the extension cannot observe the remote session itself.
+export const RecordedPlanInputSchema = z.object({
+  text: z.string().trim().min(1).max(LIMITS.maxPlanChars),
+  source: z.enum(["pasted"]),
 });
-
-export const PlanContentSchema = z.object({
-  objective: text(5_000),
-  assumptions: z.array(text(2_000)).max(50),
-  openQuestions: z.array(text(2_000)).max(50),
-  steps: z.array(z.object({ title: text(500), detail: text(5_000) })).min(1).max(100),
-  filesLikelyToChange: z.array(text(1_000)).max(500),
-  commands: z.array(PlanCommandSchema).max(100),
-  tests: z.array(text(2_000)).max(100),
-  risks: z.array(text(2_000)).max(50),
-  externalDependencies: z.array(text(1_000)).max(50),
-});
-export type PlanContent = z.infer<typeof PlanContentSchema>;
-export type PlanCommand = z.infer<typeof PlanCommandSchema>;
-
-// JSON Schema handed to Claude Code's structured-output option. Kept in sync
-// with PlanContentSchema by the protocol tests.
-export const PLAN_JSON_SCHEMA = z.toJSONSchema(PlanContentSchema, { target: "draft-7" });
+export type RecordedPlanInput = z.infer<typeof RecordedPlanInputSchema>;

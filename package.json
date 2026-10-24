@@ -1,7 +1,7 @@
 {
   "name": "inbox-handoff",
   "private": true,
-  "description": "User-triggered Gmail-to-local-Claude handoff with an enforced approval gate. Working name.",
+  "description": "Browser extension: send a Gmail conversation you choose to Claude, with a recorded approval step. Working name.",
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -14,12 +14,12 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/gmail-extract/tsconfig.json && npm run -w @inbox-handoff/extension typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "spike:real": "vitest run --config vitest.spike.config.ts",
     "test:e2e": "npm run -w @inbox-handoff/extension build:all && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
+    "fake-indexeddb": "6.2.6",
     "fast-check": "4.10.2",
     "happy-dom": "21.0.4",
     "typescript": "7.0.2",

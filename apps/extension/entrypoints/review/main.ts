@@ -1,39 +1,21 @@
 import type { CapturedConversation, Priority } from "@inbox-handoff/protocol";
 import { browser } from "wxt/browser";
-import { BRIDGE_NOT_CONNECTED, type ProjectSummary } from "../../src/bridge.ts";
-import { buildHandoff, type ReviewForm } from "../../src/handoff.ts";
+import { TaskRepo } from "../../src/db/task-repo.ts";
+import { buildTaskCreate, type ReviewForm } from "../../src/handoff.ts";
 import type { PageMessage, Reply } from "../../src/messages.ts";
+import { $, el, errorText, setStatus } from "../../src/ui.ts";
 
-// All email-derived text is inserted with textContent. Never innerHTML.
-
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const send = (msg: PageMessage) => browser.runtime.sendMessage(msg) as Promise<Reply>;
-
-function setStatus(text: string, tone: "info" | "error" | "success" = "info") {
-  const el = $("status");
-  el.textContent = text;
-  el.dataset.tone = tone;
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: string): HTMLElementTagNameMap[K] {
-  const e = document.createElement(tag);
-  if (text !== undefined) e.textContent = text;
-  if (cls) e.className = cls;
-  return e;
-}
 
 const draftId = new URLSearchParams(location.search).get("draft") ?? "";
 let draft: CapturedConversation | null = null;
-let projectsAvailable = false;
-let submitting = false;
+let busy = false;
 
 function readForm(): ReviewForm {
-  const scope = (document.querySelector<HTMLInputElement>("input[name=scope]:checked")?.value ?? "message") as ReviewForm["scope"];
-  const selected = document.querySelector<HTMLInputElement>("input[name=message]:checked")?.value ?? "";
   return {
-    scope,
-    selectedMessageId: selected,
-    projectId: $<HTMLSelectElement>("project").value,
+    scope: (document.querySelector<HTMLInputElement>("input[name=scope]:checked")?.value ?? "message") as ReviewForm["scope"],
+    selectedMessageId: document.querySelector<HTMLInputElement>("input[name=message]:checked")?.value ?? "",
+    repositoryRef: $<HTMLInputElement>("repository").value,
     title: $<HTMLInputElement>("title").value,
     instructions: $<HTMLTextAreaElement>("instructions").value,
     priority: $<HTMLSelectElement>("priority").value as Priority,
@@ -46,14 +28,13 @@ function renderMessages(d: CapturedConversation) {
   list.replaceChildren();
   d.messages.forEach((m, i) => {
     const li = el("li");
-    li.dataset.messageId = m.messageId;
     const pick = el("label");
     const radio = el("input");
     radio.type = "radio";
     radio.name = "message";
     radio.value = m.messageId;
     radio.checked = i === d.messages.length - 1; // default: the latest expanded message
-    pick.append(radio, el("span", "Send this message"));
+    pick.append(radio, el("span", "Use this message"));
     li.append(el("div", `${m.from || "(unknown sender)"} · ${m.date || "(no date)"}`, "meta"), pick, el("pre", m.bodyText || "(empty)"));
     if (m.truncated) li.append(el("p", "This message was too long and has been cut off.", "warn"));
     list.append(li);
@@ -63,87 +44,52 @@ function renderMessages(d: CapturedConversation) {
 async function refresh() {
   if (!draft) return;
   const form = readForm();
-  const messageRadios = document.querySelectorAll<HTMLInputElement>("input[name=message]");
-  messageRadios.forEach((r) => {
+  document.querySelectorAll<HTMLInputElement>("input[name=message]").forEach((r) => {
     r.disabled = form.scope === "thread";
     r.closest("li")?.classList.toggle("excluded", form.scope === "message" && !r.checked);
   });
-  const built = await buildHandoff(draft, form);
-  const payload = $("payload");
-  const sendBtn = $<HTMLButtonElement>("send");
-  if (built.ok) {
-    payload.textContent = JSON.stringify(built.handoff, null, 2);
-    sendBtn.disabled = !projectsAvailable || submitting;
-  } else {
-    payload.textContent = `Not ready: ${built.error}`;
-    sendBtn.disabled = true;
-  }
+  const built = await buildTaskCreate(draft, form);
+  $("payload").textContent = built.ok ? JSON.stringify(built.task, null, 2) : `Not ready: ${built.error}`;
+  $<HTMLButtonElement>("create").disabled = !built.ok || busy;
 }
 
-async function loadProjects() {
-  const select = $<HTMLSelectElement>("project");
-  const note = $("project-note");
-  const reply = (await send({ kind: "projects.list" })) as Reply<ProjectSummary[]>;
-  select.replaceChildren();
-  if (!reply.ok) {
-    select.append(el("option", "No projects available"));
-    select.value = "";
-    note.textContent =
-      reply.error === BRIDGE_NOT_CONNECTED
-        ? "The Inbox Handoff desktop bridge isn't connected, so nothing can be sent yet. You can still review exactly what would be sent."
-        : "Couldn't load projects from the desktop bridge.";
-    return;
-  }
-  select.append(el("option", "Choose a project…"));
-  (select.firstChild as HTMLOptionElement).value = "";
-  for (const p of reply.value) {
-    const o = el("option", p.displayName);
-    o.value = p.id;
-    select.append(o);
-  }
-  select.disabled = false;
-  projectsAvailable = true;
-  note.textContent = reply.value.length === 0 ? "No projects are configured in the desktop bridge yet." : "";
+async function warnAboutDuplicates(repo: TaskRepo, threadId: string) {
+  const existing = (await repo.tasksForThread(threadId)).filter((t) => t.status !== "Cancelled");
+  if (existing.length === 0) return;
+  const w = $("duplicate-warning");
+  w.hidden = false;
+  w.textContent = `You already have ${existing.length} task${existing.length === 1 ? "" : "s"} from this conversation. You can still create another one.`;
 }
 
-async function submit(e: Event) {
+async function create(e: Event) {
   e.preventDefault();
-  if (!draft || submitting) return;
-  const built = await buildHandoff(draft, readForm());
-  if (!built.ok) {
-    setStatus(built.error, "error");
-    return;
-  }
-  submitting = true;
-  $<HTMLButtonElement>("send").disabled = true;
-  setStatus("Sending to the desktop bridge…");
-  const reply = (await send({ kind: "handoff.submit", draftId, handoff: built.handoff })) as Reply<{ taskId: string; created: boolean }>;
-  if (reply.ok) {
-    setStatus(
-      reply.value.created
-        ? `Task created (${reply.value.taskId}). Planning won't start until you start it, and nothing is changed until you approve a plan.`
-        : `This exact handoff was already sent (task ${reply.value.taskId}). No duplicate was created.`,
-      "success",
-    );
-    $("form").querySelectorAll("input, select, textarea, button#send").forEach((x) => ((x as HTMLInputElement).disabled = true));
-    $("cancel").textContent = "Close";
-  } else {
-    submitting = false;
-    setStatus(reply.error === BRIDGE_NOT_CONNECTED ? "The desktop bridge isn't connected." : `Couldn't send: ${reply.error}`, "error");
+  if (!draft || busy) return;
+  const built = await buildTaskCreate(draft, readForm());
+  if (!built.ok) return setStatus(built.error, "error");
+  busy = true;
+  $<HTMLButtonElement>("create").disabled = true;
+  try {
+    const repo = await TaskRepo.open();
+    const { task, created } = await repo.createTask(built.task);
+    repo.close();
+    await send({ kind: "draft.discard", draftId });
+    setStatus(created ? "Task created and saved in this browser. Nothing has been sent." : "This exact task already exists. No duplicate was created.", "success");
+    $("form").hidden = true;
+    const link = $<HTMLAnchorElement>("open-task");
+    link.href = browser.runtime.getURL(`/task.html?id=${encodeURIComponent(task.id)}`);
+    $("next").hidden = false;
+    link.focus();
+  } catch (err) {
+    busy = false;
+    setStatus(`Couldn't save the task: ${errorText(err)}`, "error");
     await refresh();
   }
 }
 
 async function init() {
-  if (!draftId) {
-    setStatus("No captured email. Go back to Gmail and click Send to Claude.", "error");
-    return;
-  }
+  if (!draftId) return setStatus("No captured email. Go back to Gmail and click Send to Claude.", "error");
   const reply = (await send({ kind: "draft.get", draftId })) as Reply<CapturedConversation>;
-  if (!reply.ok) {
-    setStatus("This capture has expired or was already used. Go back to Gmail and click Send to Claude again.", "error");
-    return;
-  }
+  if (!reply.ok) return setStatus("This capture has expired or was already used. Go back to Gmail and click Send to Claude again.", "error");
   draft = reply.value;
   $("subject").textContent = draft.subject || "(no subject)";
   $<HTMLInputElement>("title").value = draft.subject;
@@ -157,12 +103,18 @@ async function init() {
   $("form").hidden = false;
   $("form").addEventListener("input", () => void refresh());
   $("form").addEventListener("change", () => void refresh());
-  $("form").addEventListener("submit", (e) => void submit(e));
+  $("form").addEventListener("submit", (e) => void create(e));
   $("cancel").addEventListener("click", async () => {
-    if (!submitting) await send({ kind: "draft.discard", draftId });
+    if (!busy) await send({ kind: "draft.discard", draftId });
     window.close();
   });
-  await loadProjects();
+  try {
+    const repo = await TaskRepo.open();
+    await warnAboutDuplicates(repo, draft.threadId);
+    repo.close();
+  } catch {
+    // The warning is advisory; creating the task reports storage errors itself.
+  }
   await refresh();
 }
 

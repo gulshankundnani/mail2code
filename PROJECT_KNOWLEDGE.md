@@ -4,6 +4,35 @@
 > contributor (human or agent) follows. Distilled from the original project
 > brief (2026-10-24). If the brief and this file disagree, ask the project owner.
 
+## ⚠ Current direction (2026-10-24): extension-only — supersedes the bridge plan
+
+The owner replaced the original brief with an **extension-only** brief: users
+install one browser extension and nothing else (no desktop bridge, native
+messaging host, daemon, local server or runtime). Everything below that
+assumes a desktop bridge, native messaging, local Claude Code execution or
+SQLite (§3, §6, §7, the bridge parts of §8, and P2–P14) is **superseded**.
+The working rules in §0 still apply.
+
+Approved decisions (recommended defaults, 2026-10-24):
+- **D1** Name: working name "Inbox Handoff", button "Send to Claude" (Anthropic branding rules don't allow "Claude Code" in a third-party product name).
+- **D2** Optional Managed Agents adapter only if a browser test confirms it works → probe result: **no-go as designed** (see `docs/claude-integrations.md`).
+- **D3** Browser handoff records approval but cannot enforce it; the UI says so.
+- **D4** Handoff opens `claude.ai/code` for GitHub repositories, otherwise `claude.ai/new`; no task content in the URL.
+- **D5** License: owner will choose later; no LICENSE until then.
+- **D6** Stored email bodies deleted 30 days after a task closes (to implement in Phase 3).
+- **D7** Safari deferred.
+- **D8** Local-CLI code removed (still in git history at `bfa5966`).
+
+Status:
+- **Phase 2 done (not yet committed):** Gmail button and capture, review page, IndexedDB task store, task page (copy brief, open Claude, user-reported submission, plan recording, recorded approval bound to plan version and hash, user-reported progress), task list with honest integration status.
+- **Evidence:** 64 unit tests and 20 E2E tests (10 each in Chromium 156 and Edge 155 on Windows) against synthetic Gmail, all passing.
+- **Not verified:** live Gmail, branded Chrome, Brave, Firefox, macOS, Linux.
+- **Next:** Phase 3 (filters, search, context refresh, retention).
+
+Current layout: `apps/extension` (WXT, MV3), `packages/protocol` (zod schemas),
+`packages/task-core` (state machine, plan hash, approval checks; browser-safe),
+`packages/gmail-extract` (DOM extraction), `fixtures/synthetic-gmail`, `tests/e2e`.
+
 ## 0. Working rules (process)
 
 - **Phase-gated.** Work proceeds phase by phase (see §17). Each phase needs the
