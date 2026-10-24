@@ -22,6 +22,10 @@ const FIREFOX_ADDON_ID = "{034066bd-772c-43e5-b155-6a7e030ac512}";
 
 export default defineConfig({
   outDir: "dist",
+  zip: {
+    artifactTemplate: "inbox-handoff-{{version}}-{{browser}}.zip",
+    sourcesTemplate: "inbox-handoff-{{version}}-sources.zip",
+  },
   manifest: ({ mode, browser }) => ({
     name: "Inbox Handoff",
     description: "Turn a Gmail conversation you choose into a task brief for Claude, and track the plan you approve. Nothing is sent unless you paste it.",

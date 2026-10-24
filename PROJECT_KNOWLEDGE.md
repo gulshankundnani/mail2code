@@ -53,9 +53,22 @@ Status:
   - **web-ext:** not kept as a dependency, because it pulls in `node-forge`/`adbkit` with 4 high-severity dev-only advisories. Run it with `npx web-ext@10.8.0 lint`.
   - **Brave:** uses the same Chromium build, with no Brave-specific code.
   - **Docs:** `docs/threat-model.md` and `docs/permissions-and-privacy.md`.
-- **Evidence:** 115 unit tests and 48 E2E tests (24 each in Chromium 156 and Edge 155 on Windows), all passing.
+- **Phase 6 done (not yet committed):**
+  - **License (D5 resolved):** MIT, © 2026 Gulshan Kundnani (owner's choice). `license: "MIT"` is set in every package.json.
+  - **Top-level docs:** README, CONTRIBUTING, SECURITY (reports go through GitHub private vulnerability reporting; no contact address is invented), CHANGELOG (Unreleased).
+  - **Other docs:** architecture, installation, troubleshooting, release-process (includes the release checklist) and dependencies (generated). No `.env.example`, because there's no configuration.
+  - **CI** (`.github/workflows/ci.yml`):
+    - Runs with `contents: read` only; actions are pinned to commit SHAs (checkout v7.0.1, setup-node v7.1.0, upload-artifact v7.0.2) and `persist-credentials: false` is set.
+    - Jobs: build and unit tests (Windows/macOS/Linux), e2e (Chromium on Linux), security (production `npm audit`, secret scan, license check, `web-ext lint` via npx), and package (zips uploaded as artifacts, no release).
+    - `.github/dependabot.yml` opens update PRs weekly; nothing merges automatically.
+  - **Scripts:** `check:manifests`, `scan:secrets` (reuses `secrets.ts`), `licenses` / `licenses:check`. The runtime closure is zod (MIT) only.
+  - **Detector precision:** assignment-style matches now require a value of at least 8 characters with at least 2 character classes, so text like "password: reset" or `passphrase: string` no longer matches.
+  - **Zips:** `zip:all` produces `inbox-handoff-<version>-{chrome,edge,firefox,sources}.zip`.
+- **No formatter or linter adopted:** TypeScript strict mode plus `.editorconfig` only. Adding one (e.g. Biome) is an open decision.
+- **CI never run yet:** no GitHub repository exists, and nothing is pushed.
+- **Evidence:** 115 unit tests and 48 E2E tests pass; the secret scan, license check, production audit and docs link check are clean; the workflow YAML parses.
 - **Not verified:** live Gmail; Firefox and Brave in a real browser (not installed here); branded Chrome; macOS; Linux.
-- **Next:** Phase 6 (GitHub preparation: README, CONTRIBUTING, SECURITY, CHANGELOG, CI, dependency/license inventory, release checklist; license still to be chosen by the owner).
+- **Next:** Phase 7 (release readiness report). Nothing gets published without explicit approval.
 
 Current layout: `apps/extension` (WXT, MV3), `packages/protocol` (zod schemas),
 `packages/task-core` (state machine, plan hash, approval checks; browser-safe),

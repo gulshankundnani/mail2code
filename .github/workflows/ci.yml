@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: jobs only read the repository. Nothing here publishes,
+# tags, releases or pushes.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and unit tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run -w @inbox-handoff/extension build:all
+      - run: npm run check:manifests
+
+  e2e:
+    name: Browser tests (Chromium, synthetic Gmail, no network)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run -w @inbox-handoff/extension build:all
+      # Edge is covered locally on Windows; CI runs Playwright's Chromium only.
+      - run: npx playwright test --project chromium
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 7
+
+  security:
+    name: Dependencies, secrets, licenses, Firefox lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Vulnerabilities in shipped dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Vulnerabilities in tooling (report only)
+        run: npm audit --audit-level=high || echo "::warning::Dev-only tooling has advisories; see npm audit output above."
+      - name: Credentials in tracked files
+        run: npm run scan:secrets
+      - name: Runtime dependency licenses
+        run: npm run licenses:check
+      - name: Firefox add-on lint
+        run: |
+          npm run -w @inbox-handoff/extension build:firefox
+          npx --yes web-ext@10.8.0 lint --source-dir apps/extension/dist/firefox-mv3
+
+  package:
+    name: Package builds (artifacts only, not a release)
+    needs: [build-and-test, e2e, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run -w @inbox-handoff/extension zip:all
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: extension-builds-${{ github.sha }}
+          path: apps/extension/dist/*.zip
+          retention-days: 14

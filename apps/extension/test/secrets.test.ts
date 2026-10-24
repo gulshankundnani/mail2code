@@ -32,8 +32,10 @@ describe("findSecrets", () => {
     expect(findSecrets(text).find((f) => f.kind === "assignment")?.count).toBe(2);
   });
 
-  it("ignores ordinary text", () => {
+  it("ignores ordinary text and code", () => {
     expect(findSecrets("Please fix the password reset page. The secret to success is tests. Token ring networks are old.")).toEqual([]);
+    expect(findSecrets("Password: reset it from the settings page")).toEqual([]);
+    expect(findSecrets("function f(passphrase: string, secret: number)")).toEqual([]);
     expect(findSecrets("Visit https://github.com/example/app and AKIA is just letters")).toEqual([]);
   });
 });

@@ -10,5 +10,6 @@
     "@inbox-handoff/protocol": "0.0.0",
     "@inbox-handoff/task-core": "0.0.0",
     "zod": "4.6.7"
-  }
+  },
+  "license": "MIT"
 }

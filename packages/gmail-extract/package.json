@@ -8,5 +8,6 @@
   },
   "dependencies": {
     "@inbox-handoff/protocol": "0.0.0"
-  }
+  },
+  "license": "MIT"
 }

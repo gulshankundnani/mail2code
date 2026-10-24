@@ -8,8 +8,17 @@ export interface SecretKind {
   label: string;
   pattern: RegExp;
   // Capture group to replace; 0 = the whole match. Used to keep the key name
-  // in "password: hunter2" and the user name in URLs.
+  // in a "password = <value>" assignment and the user name in URLs.
   group?: number;
+  // Extra check on the captured value, to skip prose and code such as
+  // "password: reset" or "passphrase: string".
+  accept?: (value: string) => boolean;
+}
+
+// At least 8 characters mixing two or more of: lower case, upper case, digits, symbols.
+function looksLikeSecretValue(v: string): boolean {
+  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((re) => re.test(v)).length;
+  return v.length >= 8 && classes >= 2;
 }
 
 export const SECRET_KINDS: readonly SecretKind[] = [
@@ -30,10 +39,18 @@ export const SECRET_KINDS: readonly SecretKind[] = [
   {
     id: "assignment",
     label: "password or secret value",
-    pattern: /\b(?:password|passwd|pwd|passphrase|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)\s*[:=]\s*["']?([^\s"',;]{6,})/gi,
+    pattern: /\b(?:password|passwd|pwd|passphrase|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)\s*[:=]\s*["']?([^\s"',;()]{6,})/gi,
     group: 1,
+    accept: looksLikeSecretValue,
   },
 ];
+
+function* matches(text: string, k: SecretKind): Generator<RegExpMatchArray> {
+  for (const m of text.matchAll(k.pattern)) {
+    const value = k.group ? m[k.group] : m[0];
+    if (value !== undefined && (!k.accept || k.accept(value))) yield m;
+  }
+}
 
 export const REDACTED = "[REDACTED]";
 
@@ -48,11 +65,11 @@ export function findSecrets(text: string): SecretFinding[] {
   const out: SecretFinding[] = [];
   let remaining = text;
   for (const k of SECRET_KINDS) {
-    const matches = remaining.match(k.pattern);
-    if (matches?.length) {
-      out.push({ kind: k.id, label: k.label, count: matches.length });
+    const found = [...matches(remaining, k)];
+    if (found.length) {
+      out.push({ kind: k.id, label: k.label, count: found.length });
       // Don't count the same text again under a broader pattern.
-      remaining = remaining.replace(k.pattern, " ");
+      for (const m of found) remaining = remaining.replace(m[0], " ");
     }
   }
   return out;
@@ -61,11 +78,10 @@ export function findSecrets(text: string): SecretFinding[] {
 export function redactSecrets(text: string): string {
   let result = text;
   for (const k of SECRET_KINDS) {
-    result = result.replace(k.pattern, (match: string, ...rest: unknown[]) => {
-      if (!k.group) return REDACTED;
-      const value = rest[k.group - 1];
-      return typeof value === "string" ? match.replace(value, REDACTED) : REDACTED;
-    });
+    for (const m of [...matches(result, k)]) {
+      const value = k.group ? m[k.group]! : m[0];
+      result = result.replace(m[0], k.group ? m[0].replace(value, REDACTED) : REDACTED);
+    }
   }
   return result;
 }

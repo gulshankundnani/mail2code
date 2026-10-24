@@ -14,7 +14,11 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/gmail-extract/tsconfig.json && npm run -w @inbox-handoff/extension typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run -w @inbox-handoff/extension build:all && playwright test"
+    "test:e2e": "npm run -w @inbox-handoff/extension build:all && playwright test",
+    "check:manifests": "node scripts/check-manifests.mjs",
+    "scan:secrets": "node --disable-warning=ExperimentalWarning scripts/scan-secrets.mjs",
+    "licenses": "node scripts/license-inventory.mjs",
+    "licenses:check": "node scripts/license-inventory.mjs --check"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
@@ -24,5 +28,6 @@
     "happy-dom": "21.0.4",
     "typescript": "7.0.2",
     "vitest": "5.0.5"
-  }
+  },
+  "license": "MIT"
 }
