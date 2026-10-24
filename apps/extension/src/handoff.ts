@@ -1,5 +1,6 @@
 import { TaskCreateSchema, idempotencyMaterial, type CapturedConversation, type Priority, type TaskCreate } from "@inbox-handoff/protocol";
 import { sha256Hex } from "@inbox-handoff/task-core";
+import { redactSecrets } from "./secrets.ts";
 
 export interface ReviewForm {
   scope: "message" | "thread";
@@ -9,13 +10,21 @@ export interface ReviewForm {
   instructions: string;
   priority: Priority;
   dueDate: string; // yyyy-mm-dd from <input type="date">, or ""
+  // Replace detected credentials with [REDACTED] before saving.
+  redactSecrets: boolean;
+}
+
+// Returns the capture with credentials redacted from subject and bodies.
+export function redactCapture(draft: CapturedConversation): CapturedConversation {
+  return { ...draft, subject: redactSecrets(draft.subject), messages: draft.messages.map((m) => ({ ...m, bodyText: redactSecrets(m.bodyText) })) };
 }
 
 export type BuildResult = { ok: true; task: TaskCreate } | { ok: false; error: string };
 
 // Builds the task exactly as shown in the review page. Validated against the
 // shared schema.
-export async function buildTaskCreate(draft: CapturedConversation, form: ReviewForm): Promise<BuildResult> {
+export async function buildTaskCreate(original: CapturedConversation, form: ReviewForm): Promise<BuildResult> {
+  const draft = form.redactSecrets ? redactCapture(original) : original;
   const chosen = form.scope === "thread" ? draft.messages : draft.messages.filter((m) => m.messageId === form.selectedMessageId);
   if (chosen.length === 0) return { ok: false, error: "Choose a message." };
   const messages = chosen.map((m) => ({ messageId: m.messageId, subject: draft.subject, from: m.from, date: m.date, bodyText: m.bodyText }));

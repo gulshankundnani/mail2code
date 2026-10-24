@@ -136,6 +136,8 @@ async function render() {
         ? `Stored email text for ${stored} message${stored === 1 ? "" : "s"} will be deleted around ${formatTime(deadline)}.`
         : `Email text for ${stored} message${stored === 1 ? " is" : "s are"} stored in this browser.`;
   $<HTMLButtonElement>("purge").disabled = stored === 0;
+  $<HTMLButtonElement>("add-note").disabled = false;
+  $<HTMLButtonElement>("delete-task").disabled = false;
   $("copy-update").hidden = newMessageIds.length === 0;
 
   // Plan versions and decisions

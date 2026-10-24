@@ -9,7 +9,8 @@
     "build:edge": "wxt build -b edge",
     "zip": "wxt zip",
     "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
-    "build:all": "wxt build && wxt build -b edge"
+    "build:all": "wxt build && wxt build -b edge && wxt build -b firefox --mv3",
+    "build:firefox": "wxt build -b firefox --mv3"
   },
   "dependencies": {
     "@inbox-handoff/gmail-extract": "0.0.0",

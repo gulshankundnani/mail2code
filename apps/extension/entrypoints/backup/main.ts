@@ -237,21 +237,30 @@ function renderPicker() {
   );
 }
 
-async function init() {
+// Listeners are attached before the database opens, so nothing the user does
+// right after the page loads is lost; each handler waits for `ready` first.
+let ready: Promise<void>;
+const whenReady = (fn: () => Promise<void>) => () =>
+  void ready.then(fn).catch((err: unknown) => setStatus(errorText(err), "error"));
+
+function init() {
   $<HTMLAnchorElement>("all-tasks").href = browser.runtime.getURL("/options.html");
-  repo = await TaskRepo.open();
-  await repo.purgeExpired();
-  tasks = await repo.listTasks();
-  renderPicker();
   for (const id of ["include-email", "encrypt"]) $(id).addEventListener("change", renderExportOptions);
   document.querySelectorAll("input[name=which]").forEach((r) => r.addEventListener("change", renderExportOptions));
-  $("export").addEventListener("click", () => void doExport());
-  $("file").addEventListener("change", () => void readFile());
-  $("decrypt").addEventListener("click", () => void decrypt());
+  $("export").addEventListener("click", whenReady(doExport));
+  $("file").addEventListener("change", whenReady(readFile));
+  $("decrypt").addEventListener("click", whenReady(decrypt));
   $("preview").addEventListener("change", renderEffect);
   $("replace-word").addEventListener("input", renderEffect);
-  $("import").addEventListener("click", () => void doImport());
+  $("import").addEventListener("click", whenReady(doImport));
   renderExportOptions();
+  ready = (async () => {
+    repo = await TaskRepo.open();
+    await repo.purgeExpired();
+    tasks = await repo.listTasks();
+    renderPicker();
+  })();
+  ready.catch((err: unknown) => setStatus(errorText(err), "error"));
 }
 
-void init().catch((err) => setStatus(errorText(err), "error"));
+init();

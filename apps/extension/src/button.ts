@@ -33,12 +33,29 @@ const STYLE = `
   }
 `;
 
+// Constructable stylesheets are not subject to the page's style-src policy,
+// unlike an inline <style>, so the button stays styled under a strict Gmail
+// CSP. Falls back to <style> where adopting a sheet isn't possible (older
+// engines, or Firefox content-script wrappers).
+function applyStyles(doc: Document, shadow: ShadowRoot): void {
+  try {
+    const Sheet = doc.defaultView?.CSSStyleSheet;
+    if (!Sheet) throw new Error("no CSSStyleSheet");
+    const sheet = new Sheet();
+    sheet.replaceSync(STYLE);
+    shadow.adoptedStyleSheets = [sheet];
+  } catch {
+    const style = doc.createElement("style");
+    style.textContent = STYLE;
+    shadow.append(style);
+  }
+}
+
 function createHost(doc: Document, onClick: (e: MouseEvent, status: StatusSink, button: HTMLButtonElement) => void): HTMLElement {
   const host = doc.createElement("span");
   host.setAttribute(HOST_ATTR, "button-host");
   const shadow = host.attachShadow({ mode: "open" });
-  const style = doc.createElement("style");
-  style.textContent = STYLE;
+  applyStyles(doc, shadow);
   const button = doc.createElement("button");
   button.type = "button";
   button.textContent = "Send to Claude";
@@ -53,7 +70,7 @@ function createHost(doc: Document, onClick: (e: MouseEvent, status: StatusSink, 
     },
   };
   button.addEventListener("click", (e) => onClick(e, sink, button));
-  shadow.append(style, button, status);
+  shadow.append(button, status);
   return host;
 }
 

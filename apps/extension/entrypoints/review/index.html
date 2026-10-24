@@ -26,6 +26,12 @@
         <p id="collapsed-note" class="warn" hidden></p>
       </fieldset>
 
+      <div id="secrets-warning" class="notice warn-box" hidden>
+        <p><strong>This email seems to contain credentials:</strong> <span id="secrets-list"></span>.</p>
+        <label><input type="checkbox" id="redact" checked> Replace them with [REDACTED] before saving</label>
+        <p class="hint">Detection is best-effort and can miss secrets. Check the text before you paste it anywhere.</p>
+      </div>
+
       <section aria-labelledby="messages-heading">
         <h2 id="messages-heading">Captured messages</h2>
         <p class="hint">Subject: <span id="subject"></span></p>

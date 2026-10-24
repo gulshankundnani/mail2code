@@ -40,9 +40,22 @@ Status:
   - **Imported data:** approvals are stored as history only (origin `imported`, superseded), and tasks that were Approved or In progress become Blocked (`imported_requires_review`).
   - **Bug found and fixed:** "implementation started" picked the newest approval by timestamp. Imported approvals carry another computer's clock, so local approvals now take precedence.
   - **Docs:** `docs/data-portability.md` (migration workflow) and `docs/backup-format.md`. No ZIP archive, because tasks have no attachments.
-- **Evidence:** 107 unit tests and 38 E2E tests (19 each in Chromium 156 and Edge 155 on Windows), all passing. The E2E tests include migrating to a second, separate browser profile with an encrypted backup.
-- **Not verified:** live Gmail, branded Chrome, Brave, Firefox, macOS, Linux.
-- **Next:** Phase 5 (security hardening, permission review, Firefox/Brave testing).
+- **Phase 5 done (not yet committed):**
+  - **Audit:** no HTML sinks or logging in production code. `npm audit` reports 0 issues; zod is the only third-party runtime dependency.
+  - **Hardening:**
+    - Strict CSP on extension pages (`connect-src 'none'`, `frame-ancestors 'none'`).
+    - zod `jitless`.
+    - The Gmail button styles use a constructable stylesheet, with an inline `<style>` fallback.
+    - The backup page attaches its listeners before opening IndexedDB. An early file choice used to be lost, which a flaky E2E run exposed.
+    - Task-page buttons start disabled until the first render.
+  - **Credential detection and redaction** (`src/secrets.ts`): on by default on the review page. The warning shows only kinds of credential, never values.
+  - **Firefox:** MV3 build with GUID add-on ID `{034066bd-772c-43e5-b155-6a7e030ac512}` (confirm before submitting to Firefox Add-ons). It declares `data_collection_permissions: none` and requires at least Firefox 140 (Android 142). `web-ext lint` gives 0 errors and 2 warnings (zod's `Function` path).
+  - **web-ext:** not kept as a dependency, because it pulls in `node-forge`/`adbkit` with 4 high-severity dev-only advisories. Run it with `npx web-ext@10.8.0 lint`.
+  - **Brave:** uses the same Chromium build, with no Brave-specific code.
+  - **Docs:** `docs/threat-model.md` and `docs/permissions-and-privacy.md`.
+- **Evidence:** 115 unit tests and 48 E2E tests (24 each in Chromium 156 and Edge 155 on Windows), all passing.
+- **Not verified:** live Gmail; Firefox and Brave in a real browser (not installed here); branded Chrome; macOS; Linux.
+- **Next:** Phase 6 (GitHub preparation: README, CONTRIBUTING, SECURITY, CHANGELOG, CI, dependency/license inventory, release checklist; license still to be chosen by the owner).
 
 Current layout: `apps/extension` (WXT, MV3), `packages/protocol` (zod schemas),
 `packages/task-core` (state machine, plan hash, approval checks; browser-safe),

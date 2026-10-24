@@ -3,7 +3,8 @@ import { STATUS_LABELS } from "@inbox-handoff/task-core";
 import { browser } from "wxt/browser";
 import type { TaskRecord } from "../../src/db/schema.ts";
 import { TaskRepo } from "../../src/db/task-repo.ts";
-import { buildTaskCreate, type ReviewForm } from "../../src/handoff.ts";
+import { buildTaskCreate, redactCapture, type ReviewForm } from "../../src/handoff.ts";
+import { findSecrets, mergeFindings } from "../../src/secrets.ts";
 import type { PageMessage, Reply } from "../../src/messages.ts";
 import { $, el, errorText, setStatus } from "../../src/ui.ts";
 
@@ -52,7 +53,8 @@ async function addToExisting() {
   $<HTMLButtonElement>("refresh").disabled = true;
   try {
     const repo = await TaskRepo.open();
-    const result = await repo.refreshContext(target, draft, selectedIds(readForm()));
+    const form = readForm();
+    const result = await repo.refreshContext(target, form.redactSecrets ? redactCapture(draft) : draft, selectedIds(form));
     repo.close();
     await send({ kind: "draft.discard", draftId });
     setStatus(
@@ -82,7 +84,14 @@ function readForm(): ReviewForm {
     instructions: $<HTMLTextAreaElement>("instructions").value,
     priority: $<HTMLSelectElement>("priority").value as Priority,
     dueDate: $<HTMLInputElement>("due").value,
+    redactSecrets: $<HTMLInputElement>("redact").checked,
   };
+}
+
+function renderSecretWarning(d: CapturedConversation) {
+  const found = mergeFindings([findSecrets(d.subject), ...d.messages.map((m) => findSecrets(m.bodyText))]);
+  $("secrets-warning").hidden = found.length === 0;
+  $("secrets-list").textContent = found.map((f) => (f.count > 1 ? `${f.count} × ${f.label}` : f.label)).join(", ");
 }
 
 function renderMessages(d: CapturedConversation) {
@@ -165,6 +174,7 @@ async function init() {
     note.textContent = `${draft.collapsedCount} collapsed message${draft.collapsedCount === 1 ? " is" : "s are"} not included. To include them, expand them in Gmail and click Send to Claude again.`;
   }
   renderMessages(draft);
+  renderSecretWarning(draft);
   $("form").hidden = false;
   $("form").addEventListener("input", () => void refresh());
   $("form").addEventListener("change", () => void refresh());

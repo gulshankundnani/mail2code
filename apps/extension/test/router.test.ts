@@ -28,6 +28,7 @@ const form = (over: Partial<ReviewForm> = {}): ReviewForm => ({
   instructions: "",
   priority: "normal",
   dueDate: "",
+  redactSecrets: true,
   ...over,
 });
 
@@ -96,6 +97,14 @@ describe("buildTaskCreate", () => {
     const r = await buildTaskCreate(conversation, form());
     expect(r.ok && r.task.title).toBe("Fix login");
     expect(r.ok && r.task.messages.map((m) => m.messageId)).toEqual(["msg-f:2"]);
+  });
+
+  it("redacts detected credentials unless the user turns redaction off", async () => {
+    const leaky = { ...conversation, messages: [{ ...conversation.messages[1]!, bodyText: "token: sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAA please" }] };
+    const on = await buildTaskCreate(leaky, form());
+    expect(on.ok && on.task.messages[0]!.bodyText).toBe("token: [REDACTED] please");
+    const off = await buildTaskCreate(leaky, form({ redactSecrets: false }));
+    expect(off.ok && off.task.messages[0]!.bodyText).toContain("sk-ant-api03");
   });
 
   it("includes every captured message for thread scope", async () => {

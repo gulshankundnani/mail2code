@@ -16,3 +16,4 @@ checked manually (see `docs/browser-compatibility.md`).
 | `no-ids.html` | Expanded message without any id attribute |
 | `two-conversations.html` | Two visible conversations (ambiguous) |
 | `inbox.html` | Inbox list; a link opens a conversation without a page reload (SPA navigation) |
+| `secrets.html` | Synthetic, non-working credentials (API key, password, database URL) for redaction tests |

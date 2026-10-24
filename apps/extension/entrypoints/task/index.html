@@ -34,7 +34,7 @@
         <pre id="brief" tabindex="0"></pre>
       </details>
       <div class="actions">
-        <button type="button" id="copy-brief">Copy brief</button>
+        <button type="button" id="copy-brief" disabled>Copy brief</button>
         <button type="button" id="open-claude" class="secondary" disabled>Open Claude</button>
         <button type="button" id="mark-submitted" class="secondary" disabled>I've sent it to Claude</button>
       </div>
@@ -82,7 +82,7 @@
         <button type="button" id="cancel-task" class="secondary danger" disabled>Cancel task</button>
       </div>
       <label for="note">Add a progress note</label>
-      <div class="row"><input id="note" maxlength="5000"><button type="button" id="add-note" class="secondary">Add note</button></div>
+      <div class="row"><input id="note" maxlength="5000"><button type="button" id="add-note" class="secondary" disabled>Add note</button></div>
     </section>
 
     <section aria-labelledby="h-context">
@@ -96,7 +96,7 @@
       <p class="meta" id="retention-info"></p>
       <div class="actions">
         <button type="button" id="copy-update" class="secondary" hidden>Copy update with new messages for Claude</button>
-        <button type="button" id="purge" class="secondary">Delete stored email text now</button>
+        <button type="button" id="purge" class="secondary" disabled>Delete stored email text now</button>
       </div>
     </section>
 
@@ -114,7 +114,7 @@
     <section aria-labelledby="h-delete">
       <h2 id="h-delete">Delete</h2>
       <p class="hint">Permanently removes this task, its stored email text, plans, decisions and history from this browser.</p>
-      <button type="button" id="delete-task" class="secondary danger">Delete this task</button>
+      <button type="button" id="delete-task" class="secondary danger" disabled>Delete this task</button>
     </section>
   </main>
   <script type="module" src="./main.ts"></script>

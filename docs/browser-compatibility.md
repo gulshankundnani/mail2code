@@ -3,15 +3,15 @@
 Status is evidence-based. "Tested" means an automated or manual run actually
 happened on the stated version; everything else is "planned" or "built".
 
-## Extension (Phases 2–4: capture, review, task page, recorded approval, filters, context refresh, retention, backup and import)
+## Extension (Phases 2–5)
 
 | Browser | Status | Evidence |
 |---|---|---|
-| Chromium (Playwright build 156.0.8078.x), Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 19/19 passing, 2026-10-24 |
-| Microsoft Edge 155.0.4283.62, Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 19/19 passing (installed Edge, headless), 2026-10-24 |
+| Chromium (Playwright build 156.0.8078.x), Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 24/24 passing, 2026-10-24 |
+| Microsoft Edge 155.0.4283.62, Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 24/24 passing (installed Edge, headless), 2026-10-24 |
 | Google Chrome 156 (branded) | Built, not automated | Branded Chrome no longer honours `--load-extension`; automation uses Playwright's Chromium. Manual unpacked load not yet done |
-| Brave | Planned (Phase 5) | Not installed on the dev machine |
-| Firefox | Planned (Phase 5) | Not installed on the dev machine |
+| Brave | Built (same Chromium MV3 build as Chrome), not tested | Brave runs Chromium extensions unchanged; no Brave-specific APIs are used. Not installed on the dev machine |
+| Firefox 140+ (desktop), 142+ (Android) | Built and linted, not tested | `wxt build -b firefox --mv3`; `web-ext lint` 10.8.0: 0 errors, 2 warnings (zod's `Function` code path, disabled at runtime and blocked by CSP). Not installed on the dev machine; Playwright can't load Firefox extensions |
 | Safari | Deferred (decision D7) | Needs macOS + Xcode |
 | macOS, Linux (any browser) | Planned | No hardware or CI run yet |
 
@@ -23,7 +23,7 @@ rendered as inert text, review page payload, task creation and duplicate
 detection, brief copied to the clipboard, "Open Claude" URL (no task content in
 it), user-reported submission, plan recording, approval, refusal of an approval
 from a tab showing an older plan, user-reported start, task list, and the
-honest integration-status panel; search and status/date filters (persisted in the URL), context refresh into an existing task (only new messages added; an approved task is blocked for review), the retention setting, deleting stored email text, deleting a task; plain and encrypted export downloads, wrong passphrase, migration into a second separate browser profile (restored tasks blocked for review, fresh approval required), damaged/foreign files, and the REPLACE confirmation.
+honest integration-status panel; search and status/date filters (persisted in the URL), context refresh into an existing task (only new messages added; an approved task is blocked for review), the retention setting, deleting stored email text, deleting a task; plain and encrypted export downloads, wrong passphrase, migration into a second separate browser profile (restored tasks blocked for review, fresh approval required), damaged/foreign files, and the REPLACE confirmation; credential redaction; least-privilege manifests and CSP for all three builds; no network requests from extension pages.
 
 ### Network isolation in tests
 
@@ -70,3 +70,11 @@ npm run -w @inbox-handoff/extension build:all
 
 - Chrome: `chrome://extensions` → Developer mode → Load unpacked → `apps/extension/dist/chrome-mv3`
 - Edge: `edge://extensions` → Developer mode → Load unpacked → `apps/extension/dist/edge-mv3`
+
+## Firefox notes
+
+- Manifest: MV3, add-on ID `{034066bd-772c-43e5-b155-6a7e030ac512}` (a GUID, so no domain is claimed; confirm it before the first addons.mozilla.org submission, after which it can't change), `data_collection_permissions: none`, minimum Firefox 140 / Firefox for Android 142.
+- Every API the extension uses exists in Firefox 140: `storage.session`, `action`, `runtime.openOptionsPage`, `tabs.create`, IndexedDB, Web Crypto, clipboard writes after a click, blob downloads.
+- To verify in a real Firefox: users can switch off Gmail site access (the button then disappears), and the button's constructable stylesheet may not attach from a content script. It then falls back to an inline `<style>`, which a strict Gmail CSP could block.
+- Load for testing: `about:debugging` → This Firefox → Load Temporary Add-on → `apps/extension/dist/firefox-mv3/manifest.json`.
+- Lint: `npx web-ext@10.8.0 lint --source-dir apps/extension/dist/firefox-mv3` (not a project dependency: it pulls in dev-only packages with open security advisories).
