@@ -68,3 +68,11 @@ section { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 4p
 .row > button { flex: 0 0 auto; }
 button.danger { color: var(--error); border-color: var(--error); }
 pre#brief, pre#plan-view { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-height: 360px; overflow: auto; font: 13px/1.45 ui-monospace, monospace; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 8px 0 12px; }
+.filters > div { flex: 1 1 140px; }
+.filters > div:first-child { flex: 2 1 240px; }
+.filters label { margin-top: 0; }
+.filters-reset { flex: 0 0 auto !important; }
+.context-banner { border: 1px solid var(--warn); border-radius: 8px; padding: 10px 14px; color: var(--warn); }
+.versions li { margin-bottom: 10px; }
+.versions .superseded { opacity: .65; }

@@ -25,9 +25,15 @@ Approved decisions (recommended defaults, 2026-10-24):
 
 Status:
 - **Phase 2 done (not yet committed):** Gmail button and capture, review page, IndexedDB task store, task page (copy brief, open Claude, user-reported submission, plan recording, recorded approval bound to plan version and hash, user-reported progress), task list with honest integration status.
-- **Evidence:** 64 unit tests and 20 E2E tests (10 each in Chromium 156 and Edge 155 on Windows) against synthetic Gmail, all passing.
+- **Phase 3 done (not yet committed):**
+  - **Task list:** search (title, repository, instructions, subject, sender), status filters (all, active, needs you, closed, or one status) and date filters (created or updated), all kept in the URL.
+  - **Context refresh:** click Send to Claude again on the same conversation and choose "Add to an existing task". Only messages the task doesn't have are added. If the task was Approved or In progress, it becomes Blocked (`context_changed`) and its approval is superseded. The task page then warns that the plan may no longer fit and offers a copyable update containing only the new messages.
+  - **Retention (D6):** stored email text is deleted 7, 30 (default) or 90 days after a task closes, or kept. Closed means Completed, Cancelled, Rejected or Failed; retrying stops the countdown. The purge runs on browser start, on install and when extension pages open, with no timer. You can also delete stored text immediately or delete the whole task.
+  - **Task page:** plan versions with their decisions, plus a history covering refresh and purge events.
+- **Not built in Phase 3:** automatic summaries of requirements, decisions, deadlines or open questions. They need a language model, and the extension has none. Users can keep their own notes instead. There's no automatic reply monitoring either, because no Gmail access is granted.
+- **Evidence:** 81 unit tests and 30 E2E tests (15 each in Chromium 156 and Edge 155 on Windows) against synthetic Gmail, all passing. The time-based purge is unit-tested with an injected clock.
 - **Not verified:** live Gmail, branded Chrome, Brave, Firefox, macOS, Linux.
-- **Next:** Phase 3 (filters, search, context refresh, retention).
+- **Next:** Phase 4 (export, import, encrypted backups, migration).
 
 Current layout: `apps/extension` (WXT, MV3), `packages/protocol` (zod schemas),
 `packages/task-core` (state machine, plan hash, approval checks; browser-safe),

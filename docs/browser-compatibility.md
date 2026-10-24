@@ -3,12 +3,12 @@
 Status is evidence-based. "Tested" means an automated or manual run actually
 happened on the stated version; everything else is "planned" or "built".
 
-## Extension (Phase 2: capture, review, task page, recorded approval)
+## Extension (Phases 2–3: capture, review, task page, recorded approval, filters, context refresh, retention)
 
 | Browser | Status | Evidence |
 |---|---|---|
-| Chromium (Playwright build 156.0.8078.x), Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 10/10 passing, 2026-10-24 |
-| Microsoft Edge 155.0.4283.62, Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 10/10 passing (installed Edge, headless), 2026-10-24 |
+| Chromium (Playwright build 156.0.8078.x), Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 15/15 passing, 2026-10-24 |
+| Microsoft Edge 155.0.4283.62, Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 15/15 passing (installed Edge, headless), 2026-10-24 |
 | Google Chrome 156 (branded) | Built, not automated | Branded Chrome no longer honours `--load-extension`; automation uses Playwright's Chromium. Manual unpacked load not yet done |
 | Brave | Planned (Phase 5) | Not installed on the dev machine |
 | Firefox | Planned (Phase 5) | Not installed on the dev machine |
@@ -23,7 +23,7 @@ rendered as inert text, review page payload, task creation and duplicate
 detection, brief copied to the clipboard, "Open Claude" URL (no task content in
 it), user-reported submission, plan recording, approval, refusal of an approval
 from a tab showing an older plan, user-reported start, task list, and the
-honest integration-status panel.
+honest integration-status panel; search and status/date filters (persisted in the URL), context refresh into an existing task (only new messages added; an approved task is blocked for review), the retention setting, deleting stored email text, and deleting a task.
 
 ### Network isolation in tests
 
@@ -48,15 +48,15 @@ Gmail has not been verified.** Manual check:
 3. Click it; check subject, sender, date and text for one message and for the whole conversation.
 4. Navigate between conversations and the inbox; confirm the button follows correctly.
 
-## Bundle size (production Chrome build, 2026-10-24)
+## Bundle size (production Chrome build, after Phase 3, 2026-10-24)
 
 | File | Raw | gzip | Loaded when |
 |---|---|---|---|
 | `content-scripts/gmail.js` | 11.1 kB | 4.4 kB | On every Gmail page |
-| `background.js` | 91.4 kB | 26.1 kB | Service worker, on demand |
-| shared page chunk (`ui-*.js`) | 98.8 kB | 28.5 kB | Extension pages only |
-| task / review / options pages | 7.8 / 4.1 / 1.8 kB | 3.3 / 1.9 / 1.0 kB | Extension pages only |
-| **Whole extension** | **228.5 kB** | — | — |
+| `background.js` | 106.3 kB | 30.1 kB | Service worker, on demand |
+| shared page chunk (`ui-*.js`) | 104.2 kB | 29.7 kB | Extension pages only |
+| task / review / options pages | 12.0 / 5.8 / 4.6 kB | 4.7 / 2.4 / 2.2 kB | Extension pages only |
+| **Whole extension** | **261.7 kB** | — | — |
 
 Most of the background and page code is the zod validation library. The Gmail
 content script deliberately does not include it (the background re-validates

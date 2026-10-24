@@ -1,10 +1,15 @@
 import {
+  CLOSED_STATUSES,
+  DEFAULT_RETENTION_DAYS,
   PlanDecisionSchema,
   RecordedPlanInputSchema,
+  RetentionDaysSchema,
   TaskCreateSchema,
   type BlockReason,
+  type CapturedConversation,
   type PlanDecision,
   type RecordedPlanInput,
+  type RetentionDays,
   type TaskCreate,
   type TaskStatus,
 } from "@inbox-handoff/protocol";
@@ -22,7 +27,7 @@ import {
   type Verdict,
 } from "@inbox-handoff/task-core";
 import { inTx, openDb, req } from "./idb.ts";
-import { DB_NAME, DB_VERSION, upgrade, type EventRecord, type SnapshotRecord, type TaskRecord } from "./schema.ts";
+import { DB_NAME, DB_VERSION, upgrade, type EventRecord, type SettingRecord, type SnapshotRecord, type TaskRecord } from "./schema.ts";
 
 export class TaskError extends Error {
   readonly code: string;
@@ -33,10 +38,21 @@ export class TaskError extends Error {
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 // Statuses in which a recorded approval still counts.
 const APPROVAL_LIVE: ReadonlySet<TaskStatus> = new Set(["Approved", "InProgress", "Completed"]);
+// Statuses where new context invalidates the go-ahead and needs a fresh review.
+const CONTEXT_SENSITIVE: ReadonlySet<TaskStatus> = new Set(["Approved", "InProgress"]);
+// No context refresh into finished tasks: start a new task instead.
+const REFRESH_CLOSED: ReadonlySet<TaskStatus> = new Set(["Completed", "Cancelled"]);
 
-const ALL = ["tasks", "snapshots", "plans", "approvals", "events"];
+const ALL = ["tasks", "snapshots", "plans", "approvals", "events", "settings"];
+
+export interface RefreshResult {
+  added: string[];
+  blocked: boolean;
+}
 
 export class TaskRepo {
   readonly db: IDBDatabase;
@@ -53,6 +69,20 @@ export class TaskRepo {
 
   close(): void {
     this.db.close();
+  }
+
+  // ---- settings ---------------------------------------------------------------
+
+  async getRetentionDays(): Promise<RetentionDays> {
+    return inTx(this.db, ["settings"], "readonly", (tx) => this.retentionInTx(tx));
+  }
+
+  async setRetentionDays(days: RetentionDays): Promise<void> {
+    const value = RetentionDaysSchema.parse(days);
+    await inTx(this.db, ["settings"], "readwrite", async (tx) => {
+      const rec: SettingRecord = { key: "retentionDays", value };
+      await req(tx.objectStore("settings").put(rec));
+    });
   }
 
   // ---- tasks ----------------------------------------------------------------
@@ -75,16 +105,17 @@ export class TaskRepo {
         scope: t.scope,
         threadId: t.threadId,
         threadUrl: t.threadUrl,
-        sources: t.messages.map((m) => ({ messageId: m.messageId, subject: m.subject, from: m.from, date: m.date })),
+        sources: t.messages.map((m) => ({ messageId: m.messageId, subject: m.subject, from: m.from, date: m.date, addedAt: now })),
         idempotencyKey: t.idempotencyKey,
         origin: "local",
         createdAt: now,
         updatedAt: now,
         lastRefreshAt: null,
         handoff: { preparedAt: null, openedAt: null, destination: null },
+        contextChangedAt: null,
       };
       await req(tx.objectStore("tasks").add(task));
-      const snap: SnapshotRecord = { taskId: task.id, messages: t.messages.map((m) => ({ messageId: m.messageId, bodyText: m.bodyText })), retainedUntil: null };
+      const snap: SnapshotRecord = { taskId: task.id, messages: t.messages.map((m) => ({ messageId: m.messageId, bodyText: m.bodyText })), closedAt: null, purgedAt: null };
       await req(tx.objectStore("snapshots").add(snap));
       await this.event(tx, task.id, "task.captured", { scope: t.scope, messageCount: t.messages.length });
       return { task, created: true };
@@ -126,6 +157,85 @@ export class TaskRepo {
     return inTx(this.db, ALL, "readwrite", async (tx) => {
       await this.transitionInTx(tx, taskId, "HandoffOpened", "user_action", { destination });
       return this.patch(tx, taskId, (t) => ({ ...t, handoff: { ...t.handoff, openedAt: this.now(), destination } }));
+    });
+  }
+
+  // Adds messages from a fresh Gmail capture of the same conversation. Only
+  // messages the task doesn't already have are added. New context never
+  // approves anything: an approved or in-progress task is blocked for review.
+  async refreshContext(taskId: string, capture: CapturedConversation, selectedIds: readonly string[]): Promise<RefreshResult> {
+    return inTx(this.db, ALL, "readwrite", async (tx) => {
+      const task = await this.requireTask(tx, taskId);
+      if (capture.threadId !== task.threadId) throw new TaskError("wrong_thread", "This capture is from a different Gmail conversation.");
+      if (REFRESH_CLOSED.has(task.status)) throw new TaskError("task_closed", "This task is closed. Create a new task instead.");
+      const known = new Set(task.sources.map((s) => s.messageId));
+      const fresh = capture.messages.filter((m) => selectedIds.includes(m.messageId) && !known.has(m.messageId));
+      const now = this.now();
+      if (fresh.length > 0) {
+        const snap = (await req(tx.objectStore("snapshots").get(taskId) as IDBRequest<SnapshotRecord | undefined>)) ?? { taskId, messages: [], closedAt: null, purgedAt: null };
+        await req(tx.objectStore("snapshots").put({ ...snap, messages: [...snap.messages, ...fresh.map((m) => ({ messageId: m.messageId, bodyText: m.bodyText }))] }));
+      }
+      await this.event(tx, taskId, "context.refreshed", { added: fresh.map((m) => m.messageId), offered: capture.messages.length });
+      await this.patch(tx, taskId, (t) => ({
+        ...t,
+        sources: [...t.sources, ...fresh.map((m) => ({ messageId: m.messageId, subject: capture.subject, from: m.from, date: m.date, addedAt: now }))],
+        lastRefreshAt: now,
+        contextChangedAt: fresh.length > 0 ? now : (t.contextChangedAt ?? null),
+      }));
+      const blocked = fresh.length > 0 && CONTEXT_SENSITIVE.has(task.status);
+      if (blocked) await this.transitionInTx(tx, taskId, "Blocked", "system", { addedMessages: fresh.length }, "context_changed");
+      return { added: fresh.map((m) => m.messageId), blocked };
+    });
+  }
+
+  // ---- retention and deletion ---------------------------------------------------
+
+  // Deletes stored email text for tasks closed longer than the retention
+  // period. Runs when the browser starts and when extension pages open; there
+  // is no background timer. Task metadata and Gmail links are kept.
+  async purgeExpired(): Promise<number> {
+    return inTx(this.db, ALL, "readwrite", async (tx) => {
+      const days = await this.retentionInTx(tx);
+      if (days === null) return 0;
+      const cutoff = this.now() - days * DAY_MS;
+      let purged = 0;
+      for (const snap of await req(tx.objectStore("snapshots").getAll() as IDBRequest<SnapshotRecord[]>)) {
+        if (snap.closedAt == null || snap.closedAt > cutoff || snap.messages.length === 0) continue;
+        await this.purgeInTx(tx, snap, "retention");
+        purged++;
+      }
+      return purged;
+    });
+  }
+
+  async purgeSnapshot(taskId: string): Promise<void> {
+    await inTx(this.db, ALL, "readwrite", async (tx) => {
+      await this.requireTask(tx, taskId);
+      const snap = await req(tx.objectStore("snapshots").get(taskId) as IDBRequest<SnapshotRecord | undefined>);
+      if (snap && snap.messages.length > 0) await this.purgeInTx(tx, snap, "user");
+    });
+  }
+
+  // When stored email text will be deleted, or null if it won't be.
+  async retentionDeadline(taskId: string): Promise<number | null> {
+    return inTx(this.db, ["snapshots", "settings"], "readonly", async (tx) => {
+      const days = await this.retentionInTx(tx);
+      const snap = await req(tx.objectStore("snapshots").get(taskId) as IDBRequest<SnapshotRecord | undefined>);
+      if (days === null || !snap || snap.closedAt == null || snap.messages.length === 0) return null;
+      return snap.closedAt + days * DAY_MS;
+    });
+  }
+
+  // Permanently removes the task and everything recorded about it.
+  async deleteTask(taskId: string): Promise<void> {
+    await inTx(this.db, ALL, "readwrite", async (tx) => {
+      await this.requireTask(tx, taskId);
+      await req(tx.objectStore("tasks").delete(taskId));
+      await req(tx.objectStore("snapshots").delete(taskId));
+      for (const store of ["plans", "approvals", "events"]) {
+        const keys = await req(tx.objectStore(store).index("taskId").getAllKeys(taskId));
+        for (const k of keys) await req(tx.objectStore(store).delete(k));
+      }
     });
   }
 
@@ -238,8 +348,30 @@ export class TaskRepo {
     const task = await this.requireTask(tx, taskId);
     assertTransition(task.status, to, cause);
     if (!APPROVAL_LIVE.has(to)) await this.supersedeApprovals(tx, taskId);
+    await this.updateRetentionClock(tx, taskId, task.status, to);
     await this.event(tx, taskId, "task.transition", { from: task.status, to, cause, ...(blockReason ? { blockReason } : {}), ...data });
     return this.patch(tx, taskId, (t) => ({ ...t, status: to, blockReason: to === "Blocked" ? (blockReason ?? "blocked_by_user") : null }));
+  }
+
+  // Starts the retention countdown when a task closes; stops it if retried.
+  private async updateRetentionClock(tx: IDBTransaction, taskId: string, from: TaskStatus, to: TaskStatus): Promise<void> {
+    const closing = CLOSED_STATUSES.has(to) && !CLOSED_STATUSES.has(from);
+    const reopening = CLOSED_STATUSES.has(from) && !CLOSED_STATUSES.has(to);
+    if (!closing && !reopening) return;
+    const store = tx.objectStore("snapshots");
+    const snap = await req(store.get(taskId) as IDBRequest<SnapshotRecord | undefined>);
+    if (snap) await req(store.put({ ...snap, closedAt: closing ? this.now() : null }));
+  }
+
+  private async purgeInTx(tx: IDBTransaction, snap: SnapshotRecord, reason: "retention" | "user"): Promise<void> {
+    await req(tx.objectStore("snapshots").put({ ...snap, messages: [], purgedAt: this.now() }));
+    await this.event(tx, snap.taskId, "context.purged", { reason, messageCount: snap.messages.length });
+  }
+
+  private async retentionInTx(tx: IDBTransaction): Promise<RetentionDays> {
+    const rec = await req(tx.objectStore("settings").get("retentionDays") as IDBRequest<SettingRecord | undefined>);
+    const parsed = RetentionDaysSchema.safeParse(rec?.value);
+    return rec && parsed.success ? parsed.data : DEFAULT_RETENTION_DAYS;
   }
 
   private async patch(tx: IDBTransaction, taskId: string, fn: (t: TaskRecord) => TaskRecord): Promise<TaskRecord> {

@@ -32,8 +32,18 @@
         <ol id="messages"></ol>
       </section>
 
+      <fieldset id="refresh-section" hidden>
+        <legend>Add to an existing task instead</legend>
+        <p class="hint">
+          Adds only the selected messages that the task doesn't already have. New messages never approve anything.
+          If that task's plan is already approved, it's blocked so you can review the plan again.
+        </p>
+        <ul id="refresh-tasks" class="refresh-tasks"></ul>
+        <div class="actions"><button type="button" id="refresh" class="secondary" disabled>Add new messages to this task</button></div>
+      </fieldset>
+
       <fieldset>
-        <legend>Task</legend>
+        <legend>New task</legend>
         <label for="title">Title</label>
         <input id="title" maxlength="300" required>
 

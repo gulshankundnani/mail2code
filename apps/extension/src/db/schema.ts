@@ -9,6 +9,8 @@ export interface SourceRef {
   subject: string;
   from: string;
   date: string;
+  // When the message was added to the task (capture or refresh). Absent on Phase 2 records.
+  addedAt?: number;
 }
 
 export interface TaskRecord {
@@ -30,13 +32,26 @@ export interface TaskRecord {
   updatedAt: number;
   lastRefreshAt: number | null;
   handoff: { preparedAt: number | null; openedAt: number | null; destination: string | null };
+  // Set when a context refresh added messages; compared with the latest plan's
+  // time to warn that the plan may no longer fit. Absent on Phase 2 records.
+  contextChangedAt?: number | null;
 }
 
 // Email bodies live apart from tasks so they can be purged on their own.
+// Optional fields are absent on records written by the Phase 2 build, which
+// also carry an unused `retainedUntil: null`.
 export interface SnapshotRecord {
   taskId: string;
   messages: { messageId: string; bodyText: string }[];
-  retainedUntil: number | null;
+  // When the task entered a closed status; the retention countdown starts here.
+  // null while the task is open (or after it was retried).
+  closedAt?: number | null;
+  purgedAt?: number | null;
+}
+
+export interface SettingRecord {
+  key: "retentionDays";
+  value: unknown;
 }
 
 export interface EventRecord {

@@ -20,6 +20,7 @@
     </dl>
 
     <div id="status" role="status" aria-live="polite"></div>
+    <p id="context-banner" class="context-banner" hidden></p>
 
     <section id="step-handoff" aria-labelledby="h-handoff">
       <h2 id="h-handoff">1. Hand off to Claude</h2>
@@ -84,9 +85,36 @@
       <div class="row"><input id="note" maxlength="5000"><button type="button" id="add-note" class="secondary">Add note</button></div>
     </section>
 
+    <section aria-labelledby="h-context">
+      <h2 id="h-context">Email context</h2>
+      <p class="hint">
+        To refresh, open the conversation in Gmail, click <strong>Send to Claude</strong> again and choose
+        <em>Add to an existing task</em>. The extension doesn't watch your inbox.
+      </p>
+      <p class="meta" id="refresh-info"></p>
+      <ol id="sources" class="history"></ol>
+      <p class="meta" id="retention-info"></p>
+      <div class="actions">
+        <button type="button" id="copy-update" class="secondary" hidden>Copy update with new messages for Claude</button>
+        <button type="button" id="purge" class="secondary">Delete stored email text now</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-plans">
+      <h2 id="h-plans">Plan versions and decisions</h2>
+      <p id="no-plans" class="hint">No plans recorded yet.</p>
+      <ol id="plan-versions" class="versions"></ol>
+    </section>
+
     <section aria-labelledby="h-history">
       <h2 id="h-history">History</h2>
       <ol id="history" class="history"></ol>
+    </section>
+
+    <section aria-labelledby="h-delete">
+      <h2 id="h-delete">Delete</h2>
+      <p class="hint">Permanently removes this task, its stored email text, plans, decisions and history from this browser.</p>
+      <button type="button" id="delete-task" class="secondary danger">Delete this task</button>
     </section>
   </main>
   <script type="module" src="./main.ts"></script>

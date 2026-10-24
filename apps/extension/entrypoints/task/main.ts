@@ -1,8 +1,8 @@
 import type { TaskStatus } from "@inbox-handoff/protocol";
 import { STATUS_LABELS, allowedTargets, type PlanRecord } from "@inbox-handoff/task-core";
 import { browser } from "wxt/browser";
-import { buildBrief, handoffDestination } from "../../src/brief.ts";
-import type { EventRecord, TaskRecord } from "../../src/db/schema.ts";
+import { buildBrief, buildContextUpdate, handoffDestination } from "../../src/brief.ts";
+import type { EventRecord, SnapshotRecord, TaskRecord } from "../../src/db/schema.ts";
 import { TaskRepo } from "../../src/db/task-repo.ts";
 import { $, el, errorText, formatTime, setStatus } from "../../src/ui.ts";
 
@@ -10,12 +10,16 @@ const taskId = new URLSearchParams(location.search).get("id") ?? "";
 let repo: TaskRepo;
 let task: TaskRecord | null = null;
 let latestPlan: PlanRecord | null = null;
+let snapshot: SnapshotRecord | null = null;
 let brief = "";
+// Messages added by a refresh after the brief was handed off.
+let newMessageIds: string[] = [];
 
 const BLOCK_REASON_TEXT: Record<string, string> = {
   imported_requires_review: "Restored from a backup: review before continuing.",
   plan_needs_changes: "The plan needs changes.",
   blocked_by_user: "Blocked by you.",
+  context_changed: "New email messages arrived after approval: review the plan again.",
 };
 
 function eventText(e: EventRecord): string {
@@ -29,6 +33,12 @@ function eventText(e: EventRecord): string {
       return `Plan v${String(d.version)} recorded (fingerprint ${String(d.hash).slice(0, 12)}…)`;
     case "note":
       return `Note: ${String(d.text)}`;
+    case "context.refreshed": {
+      const n = Array.isArray(d.added) ? d.added.length : 0;
+      return n === 0 ? "Context refreshed: no new messages" : `Context refreshed: ${n} new message${n === 1 ? "" : "s"} added`;
+    }
+    case "context.purged":
+      return d.reason === "retention" ? "Stored email text deleted (retention setting)" : "Stored email text deleted by you";
     default:
       return e.type;
   }
@@ -43,10 +53,23 @@ async function render() {
     document.querySelectorAll("section").forEach((s) => (s.hidden = true));
     return;
   }
-  latestPlan = await repo.getLatestPlan(taskId);
+  const plans = await repo.getPlans(taskId);
+  latestPlan = plans.at(-1) ?? null;
   const approvals = await repo.getApprovals(taskId);
-  brief = buildBrief(task, await repo.getSnapshot(taskId));
+  snapshot = await repo.getSnapshot(taskId);
+  brief = buildBrief(task, snapshot);
   const dest = handoffDestination(task.repositoryRef);
+  const openedAt = task.handoff.openedAt;
+  newMessageIds = openedAt === null ? [] : task.sources.filter((s) => (s.addedAt ?? 0) > openedAt).map((s) => s.messageId);
+
+  // Changed-requirements warning: messages arrived after the latest plan.
+  const changedAt = task.contextChangedAt ?? null;
+  const banner = $("context-banner");
+  const afterPlan = changedAt !== null && latestPlan !== null && changedAt > latestPlan.recordedAt;
+  banner.hidden = !afterPlan && !(changedAt !== null && newMessageIds.length > 0);
+  banner.textContent = afterPlan
+    ? `New email messages were added after plan version ${latestPlan!.version} was recorded. Check whether the plan still fits, and record a revised plan if it doesn't.`
+    : "New email messages were added after you handed the brief to Claude. Send Claude the update below.";
 
   document.title = `${task.title} – Inbox Handoff`;
   $("title").textContent = task.title;
@@ -92,6 +115,51 @@ async function render() {
   $<HTMLButtonElement>("block").disabled = !can("Blocked");
   $<HTMLButtonElement>("unblock").disabled = task.status !== "Blocked";
   $<HTMLButtonElement>("cancel-task").disabled = !can("Cancelled");
+
+  // Context
+  $("refresh-info").textContent = task.lastRefreshAt ? `Last refreshed ${formatTime(task.lastRefreshAt)}.` : "Not refreshed since capture.";
+  $("sources").replaceChildren(
+    ...task.sources.map((s) => {
+      const li = el("li", `${s.from || "(unknown sender)"} · ${s.date || "(no date)"}${s.addedAt && s.addedAt > task!.createdAt ? ` · added ${formatTime(s.addedAt)}` : ""}`);
+      if (newMessageIds.includes(s.messageId)) li.append(el("span", " (new since handoff)", "warn"));
+      return li;
+    }),
+  );
+  const stored = snapshot?.messages.length ?? 0;
+  const deadline = await repo.retentionDeadline(taskId);
+  $("retention-info").textContent =
+    stored === 0
+      ? snapshot?.purgedAt
+        ? `Stored email text was deleted ${formatTime(snapshot.purgedAt)}. The brief can no longer include it; refresh from Gmail if you need it again.`
+        : "No email text is stored for this task."
+      : deadline !== null
+        ? `Stored email text for ${stored} message${stored === 1 ? "" : "s"} will be deleted around ${formatTime(deadline)}.`
+        : `Email text for ${stored} message${stored === 1 ? " is" : "s are"} stored in this browser.`;
+  $<HTMLButtonElement>("purge").disabled = stored === 0;
+  $("copy-update").hidden = newMessageIds.length === 0;
+
+  // Plan versions and decisions
+  $("no-plans").hidden = plans.length > 0;
+  $("plan-versions").replaceChildren(
+    ...plans
+      .slice()
+      .reverse()
+      .map((p) => {
+        const li = el("li");
+        if (p.id !== latestPlan?.id) li.className = "superseded";
+        const details = el("details");
+        details.append(el("summary", `Version ${p.version} · ${formatTime(p.recordedAt)} · fingerprint ${p.hash.slice(0, 16)}…${p.id === latestPlan?.id ? " (current)" : ""}`), el("pre", p.text));
+        li.append(details);
+        const decisions = approvals.filter((a) => a.planId === p.id);
+        if (decisions.length === 0) li.append(el("div", "No decision recorded.", "meta"));
+        for (const a of decisions) {
+          const verb = a.decision === "approve" ? "Approved" : a.decision === "reject" ? "Rejected" : "Changes requested";
+          const notes = [a.origin === "imported" ? "imported, history only" : "", a.supersededAt ? `no longer current since ${formatTime(a.supersededAt)}` : ""].filter(Boolean).join("; ");
+          li.append(el("div", `${verb} ${formatTime(a.decidedAt)}${a.comment ? ` — “${a.comment}”` : ""}${notes ? ` (${notes})` : ""}`, "meta"));
+        }
+        return li;
+      }),
+  );
 
   const history = $("history");
   history.replaceChildren(...(await repo.getEvents(taskId)).reverse().map((e) => el("li", `${formatTime(e.at)} — ${eventText(e)}`)));
@@ -181,7 +249,28 @@ async function init() {
     await repo.addNote(taskId, $<HTMLInputElement>("note").value);
     $<HTMLInputElement>("note").value = "";
   });
+  action("copy-update", async () => {
+    if (!task) return;
+    await navigator.clipboard.writeText(buildContextUpdate(task, snapshot, newMessageIds));
+    await repo.addNote(taskId, `Copied an update with ${newMessageIds.length} new message(s) for Claude.`);
+    return "Update copied. Paste it into your Claude conversation; nothing has been sent yet.";
+  });
+  action("purge", async () => {
+    if (!confirm("Delete the stored email text for this task? The task, its Gmail link and history are kept.")) return;
+    await repo.purgeSnapshot(taskId);
+    return "Stored email text deleted.";
+  });
+  $("delete-task").addEventListener("click", async () => {
+    if (!confirm("Permanently delete this task and everything recorded about it? This can't be undone.")) return;
+    try {
+      await repo.deleteTask(taskId);
+      location.replace(browser.runtime.getURL("/options.html"));
+    } catch (err) {
+      setStatus(errorText(err), "error");
+    }
+  });
 
+  await repo.purgeExpired();
   await render();
 }
 
