@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Back up and restore – Inbox Handoff</title>
+  <link rel="stylesheet" href="../../assets/common.css">
+</head>
+<body>
+  <main>
+    <p><a id="all-tasks" href="#">← All tasks</a></p>
+    <h1>Back up and restore</h1>
+    <p class="hint">
+      Backups are files on your computer. Nothing is uploaded anywhere. To move to another computer, export here,
+      install the extension there, and import the file.
+    </p>
+    <div id="status" role="status" aria-live="polite"></div>
+
+    <section aria-labelledby="h-export">
+      <h2 id="h-export">Export</h2>
+      <fieldset>
+        <legend>Tasks</legend>
+        <label><input type="radio" name="which" value="all" checked> All tasks (<span id="task-total">0</span>)</label>
+        <label><input type="radio" name="which" value="selected"> Selected tasks</label>
+        <ul id="task-picker" class="picker" hidden></ul>
+      </fieldset>
+      <fieldset>
+        <legend>Contents</legend>
+        <label><input type="checkbox" id="include-email"> Include stored email text</label>
+        <p class="hint">Only text still stored in this browser is included. Plans, decisions and history are always included. No passwords, tokens or cookies are stored by this extension, so none can be exported.</p>
+        <label><input type="checkbox" id="encrypt"> Encrypt with a passphrase</label>
+        <div id="passphrase-fields" hidden>
+          <label for="passphrase">Passphrase (at least 12 characters)</label>
+          <input id="passphrase" type="password" autocomplete="new-password" minlength="12">
+          <label for="passphrase2">Repeat passphrase</label>
+          <input id="passphrase2" type="password" autocomplete="new-password" minlength="12">
+          <p class="hint">The passphrase isn't stored anywhere. If you forget it, the backup can't be opened.</p>
+        </div>
+        <p id="plain-email-warning" class="warn-box notice" hidden>
+          <label><input type="checkbox" id="ack-plain"> I understand this file will contain email text that anyone with the file can read.</label>
+        </p>
+      </fieldset>
+      <div class="actions"><button type="button" id="export">Download backup</button></div>
+    </section>
+
+    <section aria-labelledby="h-import">
+      <h2 id="h-import">Import</h2>
+      <label for="file">Backup file</label>
+      <input id="file" type="file" accept=".json,application/json">
+      <div id="decrypt-fields" hidden>
+        <label for="import-passphrase">This backup is encrypted. Passphrase</label>
+        <input id="import-passphrase" type="password" autocomplete="current-password">
+        <div class="actions"><button type="button" id="decrypt" class="secondary">Decrypt</button></div>
+      </div>
+
+      <div id="preview" hidden>
+        <h3>What's in this backup</h3>
+        <p class="meta" id="preview-summary"></p>
+        <ul id="preview-warnings" class="warn"></ul>
+        <ul id="preview-tasks" class="history"></ul>
+
+        <fieldset>
+          <legend>How to import</legend>
+          <label><input type="radio" name="strategy" value="restore"> Restore into this empty installation</label>
+          <label><input type="radio" name="strategy" value="merge"> Merge with the tasks already here</label>
+          <label><input type="radio" name="strategy" value="replace"> Replace all tasks here with the backup</label>
+          <div id="conflict-options" hidden>
+            <p class="hint">Some tasks exist here and in the backup with different content.</p>
+            <label><input type="radio" name="resolution" value="keep-existing" checked> Keep the version in this browser</label>
+            <label><input type="radio" name="resolution" value="use-imported"> Use the version from the backup</label>
+          </div>
+          <div id="replace-confirm" hidden>
+            <p class="warn">This permanently deletes <span id="replace-count">0</span> task(s) in this browser before importing.</p>
+            <label for="replace-word">Type REPLACE to confirm</label>
+            <input id="replace-word" autocomplete="off">
+          </div>
+        </fieldset>
+        <p class="meta" id="effect"></p>
+        <p class="hint">
+          Imported tasks never run anything. Tasks that were approved or in progress come back as <strong>Blocked</strong>,
+          and their old approvals are kept as history only. You'll need to approve again on this computer.
+        </p>
+        <div class="actions"><button type="button" id="import" disabled>Import</button></div>
+      </div>
+      <div id="report" hidden>
+        <h3>Import finished</h3>
+        <ul id="report-list" class="history"></ul>
+        <p class="hint">Next: review restored tasks, update repository references if they changed, and refresh email context from Gmail where the text wasn't included.</p>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

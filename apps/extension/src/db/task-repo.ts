@@ -54,6 +54,27 @@ export interface RefreshResult {
   blocked: boolean;
 }
 
+export interface DatabaseDump {
+  tasks: TaskRecord[];
+  snapshots: SnapshotRecord[];
+  plans: PlanRecord[];
+  approvals: ApprovalRecord[];
+  events: EventRecord[];
+  retentionDays: RetentionDays;
+}
+
+export interface ImportOperation {
+  replaceAll: boolean;
+  deleteTaskIds: string[];
+  tasks: TaskRecord[];
+  snapshots: SnapshotRecord[];
+  plans: PlanRecord[];
+  approvals: ApprovalRecord[];
+  events: EventRecord[];
+  // undefined = leave the setting unchanged
+  retentionDays?: RetentionDays;
+}
+
 export class TaskRepo {
   readonly db: IDBDatabase;
   private readonly now: () => number;
@@ -239,6 +260,45 @@ export class TaskRepo {
     });
   }
 
+  // ---- backup ------------------------------------------------------------------
+
+  async dump(): Promise<DatabaseDump> {
+    return inTx(this.db, ALL, "readonly", async (tx) => ({
+      tasks: await req(tx.objectStore("tasks").getAll() as IDBRequest<TaskRecord[]>),
+      snapshots: await req(tx.objectStore("snapshots").getAll() as IDBRequest<SnapshotRecord[]>),
+      plans: await req(tx.objectStore("plans").getAll() as IDBRequest<PlanRecord[]>),
+      approvals: await req(tx.objectStore("approvals").getAll() as IDBRequest<ApprovalRecord[]>),
+      events: await req(tx.objectStore("events").getAll() as IDBRequest<EventRecord[]>),
+      retentionDays: await this.retentionInTx(tx),
+    }));
+  }
+
+  // Applies a prepared import in ONE transaction: if anything fails (for
+  // example a duplicate key), nothing is changed and the existing data stays.
+  async applyImport(op: ImportOperation): Promise<void> {
+    await inTx(this.db, ALL, "readwrite", async (tx) => {
+      if (op.replaceAll) {
+        for (const store of ["tasks", "snapshots", "plans", "approvals", "events"]) await req(tx.objectStore(store).clear());
+      }
+      for (const id of op.deleteTaskIds) {
+        await req(tx.objectStore("tasks").delete(id));
+        await req(tx.objectStore("snapshots").delete(id));
+        for (const store of ["plans", "approvals", "events"]) {
+          for (const k of await req(tx.objectStore(store).index("taskId").getAllKeys(id))) await req(tx.objectStore(store).delete(k));
+        }
+      }
+      for (const t of op.tasks) await req(tx.objectStore("tasks").add(t));
+      for (const s of op.snapshots) await req(tx.objectStore("snapshots").add(s));
+      for (const p of op.plans) await req(tx.objectStore("plans").add(p));
+      for (const a of op.approvals) await req(tx.objectStore("approvals").add(a));
+      for (const e of op.events) await req(tx.objectStore("events").add(e));
+      if (op.retentionDays !== undefined) {
+        const rec: SettingRecord = { key: "retentionDays", value: RetentionDaysSchema.parse(op.retentionDays) };
+        await req(tx.objectStore("settings").put(rec));
+      }
+    });
+  }
+
   // ---- plans and approvals ------------------------------------------------------
 
   async getPlans(taskId: string): Promise<PlanRecord[]> {
@@ -314,7 +374,12 @@ export class TaskRepo {
       const plans = await req(tx.objectStore("plans").index("taskId").getAll(taskId) as IDBRequest<PlanRecord[]>);
       const latestPlan = plans.sort((a, b) => a.version - b.version).at(-1) ?? null;
       const approvals = await req(tx.objectStore("approvals").index("taskId").getAll(taskId) as IDBRequest<ApprovalRecord[]>);
-      const approval = approvals.filter((a) => a.decision === "approve").sort((a, b) => a.decidedAt - b.decidedAt).at(-1) ?? null;
+      // Prefer local approvals: imported ones carry another computer's clock,
+      // so "most recent by time" across both kinds is meaningless. Imported
+      // approvals are only considered to report why they don't count.
+      const byTime = (a: ApprovalRecord, b: ApprovalRecord) => a.decidedAt - b.decidedAt;
+      const approves = approvals.filter((a) => a.decision === "approve");
+      const approval = approves.filter((a) => a.origin === "local").sort(byTime).at(-1) ?? approves.sort(byTime).at(-1) ?? null;
       const verdict: Verdict<CurrentApprovalRejection> = hasCurrentApproval({ latestPlan, approval });
       if (!verdict.ok) throw new TaskError(verdict.reason, "Implementation can only be marked as started after you approve the current plan.");
       return this.transitionInTx(tx, taskId, "InProgress", "user_action");

@@ -1,0 +1,14 @@
+{
+  "name": "@inbox-handoff/backup",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@inbox-handoff/protocol": "0.0.0",
+    "@inbox-handoff/task-core": "0.0.0",
+    "zod": "4.6.7"
+  }
+}

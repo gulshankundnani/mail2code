@@ -76,3 +76,7 @@ pre#brief, pre#plan-view { white-space: pre-wrap; overflow-wrap: anywhere; backg
 .context-banner { border: 1px solid var(--warn); border-radius: 8px; padding: 10px 14px; color: var(--warn); }
 .versions li { margin-bottom: 10px; }
 .versions .superseded { opacity: .65; }
+.picker { list-style: none; padding-left: 4px; max-height: 240px; overflow: auto; }
+.picker label { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+fieldset label:has(input[type=checkbox]) { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+#preview-tasks li[data-kind=conflict] strong, #preview-tasks li[data-kind=duplicate-key] strong { color: var(--warn); }

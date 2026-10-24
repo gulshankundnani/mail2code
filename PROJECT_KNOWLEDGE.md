@@ -31,9 +31,18 @@ Status:
   - **Retention (D6):** stored email text is deleted 7, 30 (default) or 90 days after a task closes, or kept. Closed means Completed, Cancelled, Rejected or Failed; retrying stops the countdown. The purge runs on browser start, on install and when extension pages open, with no timer. You can also delete stored text immediately or delete the whole task.
   - **Task page:** plan versions with their decisions, plus a history covering refresh and purge events.
 - **Not built in Phase 3:** automatic summaries of requirements, decisions, deadlines or open questions. They need a language model, and the extension has none. Users can keep their own notes instead. There's no automatic reply monitoring either, because no Gmail access is granted.
-- **Evidence:** 81 unit tests and 30 E2E tests (15 each in Chromium 156 and Edge 155 on Windows) against synthetic Gmail, all passing. The time-based purge is unit-tested with an injected clock.
+- **Phase 4 done (not yet committed):**
+  - **Code:** `packages/backup` holds the format, checksum, encryption, validation and import planning. `apps/extension/src/backup/mapping.ts` converts between database records and the export format. The new `backup.html` page is linked from the task list.
+  - **Format:** versioned JSON (`inbox-handoff-export` v1). It is validated strictly (unknown fields are rejected), carries a SHA-256 checksum, and is documented in `docs/backup-format.md`.
+  - **Export:** all or selected tasks. Email text is off by default; including it requires either encryption or an explicit acknowledgement.
+  - **Encryption:** optional, using Web Crypto (PBKDF2-SHA256 at 600,000 iterations, then AES-256-GCM with the parameters as additional authenticated data). The passphrase must be at least 12 characters and is never stored.
+  - **Import:** checks size, JSON, format, version, schema, checksum, references between records, then plan fingerprints. It shows a preview and offers three strategies: restore (only into an empty installation), merge (choose which version wins on conflicts; duplicate handoffs are skipped), or replace (type REPLACE). Everything is applied in one IndexedDB transaction.
+  - **Imported data:** approvals are stored as history only (origin `imported`, superseded), and tasks that were Approved or In progress become Blocked (`imported_requires_review`).
+  - **Bug found and fixed:** "implementation started" picked the newest approval by timestamp. Imported approvals carry another computer's clock, so local approvals now take precedence.
+  - **Docs:** `docs/data-portability.md` (migration workflow) and `docs/backup-format.md`. No ZIP archive, because tasks have no attachments.
+- **Evidence:** 107 unit tests and 38 E2E tests (19 each in Chromium 156 and Edge 155 on Windows), all passing. The E2E tests include migrating to a second, separate browser profile with an encrypted backup.
 - **Not verified:** live Gmail, branded Chrome, Brave, Firefox, macOS, Linux.
-- **Next:** Phase 4 (export, import, encrypted backups, migration).
+- **Next:** Phase 5 (security hardening, permission review, Firefox/Brave testing).
 
 Current layout: `apps/extension` (WXT, MV3), `packages/protocol` (zod schemas),
 `packages/task-core` (state machine, plan hash, approval checks; browser-safe),

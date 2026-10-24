@@ -11,6 +11,52 @@ export interface ExtensionOptions {
 const FIXTURES = resolve("fixtures/synthetic-gmail");
 export const CLAUDE_STUB = "<!doctype html><title>Claude (stub)</title><h1>claude.ai stub for tests</h1>";
 
+// Launches a browser with the extension in a fresh profile. Each call is a
+// separate "computer" with its own IndexedDB.
+export async function launchExtension(browserChannel: string, extensionBuild: string): Promise<{ context: BrowserContext; close: () => Promise<void> }> {
+  const ext = resolve(extensionBuild);
+  const profile = mkdtempSync(join(tmpdir(), "ih-e2e-profile-"));
+  const context = await chromium.launchPersistentContext(profile, {
+    channel: browserChannel,
+    headless: true,
+    args: [
+      `--disable-extensions-except=${ext}`,
+      `--load-extension=${ext}`,
+      // Network kill switch: no hostname resolves, so nothing can reach the
+      // internet. Needed because tabs opened by the extension itself
+      // (tabs.create) bypass context.route below.
+      "--host-resolver-rules=MAP * ~NOTFOUND",
+    ],
+  });
+  // Synthetic Gmail and a claude.ai stub for pages Playwright can intercept;
+  // every other request is aborted.
+  await context.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.origin === "https://mail.google.com") {
+      const name = url.searchParams.get("fixture") ?? "single-message.html";
+      await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: readFileSync(join(FIXTURES, name), "utf8") });
+    } else if (url.origin === "https://claude.ai") {
+      await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: CLAUDE_STUB });
+    } else if (url.protocol === "http:" || url.protocol === "https:") {
+      await route.abort();
+    } else {
+      await route.fallback();
+    }
+  });
+  return {
+    context,
+    close: async () => {
+      await context.close();
+      rmSync(profile, { recursive: true, force: true });
+    },
+  };
+}
+
+export async function extensionIdOf(context: BrowserContext): Promise<string> {
+  const sw = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker", { timeout: 15_000 }));
+  return new URL(sw.url()).host;
+}
+
 interface Fixtures {
   context: BrowserContext;
   extensionId: string;
@@ -26,43 +72,13 @@ export const test = base.extend<Fixtures & ExtensionOptions>({
   extensionBuild: ["", { option: true }],
 
   context: async ({ browserChannel, extensionBuild }, use) => {
-    const ext = resolve(extensionBuild);
-    const profile = mkdtempSync(join(tmpdir(), "ih-e2e-profile-"));
-    const context = await chromium.launchPersistentContext(profile, {
-      channel: browserChannel,
-      headless: true,
-      args: [
-        `--disable-extensions-except=${ext}`,
-        `--load-extension=${ext}`,
-        // Network kill switch: no hostname resolves, so nothing can reach the
-        // internet. Needed because tabs opened by the extension itself
-        // (tabs.create) bypass context.route below.
-        "--host-resolver-rules=MAP * ~NOTFOUND",
-      ],
-    });
-    // Synthetic Gmail and a claude.ai stub for pages Playwright can intercept;
-    // every other request is aborted.
-    await context.route("**/*", async (route) => {
-      const url = new URL(route.request().url());
-      if (url.origin === "https://mail.google.com") {
-        const name = url.searchParams.get("fixture") ?? "single-message.html";
-        await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: readFileSync(join(FIXTURES, name), "utf8") });
-      } else if (url.origin === "https://claude.ai") {
-        await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: CLAUDE_STUB });
-      } else if (url.protocol === "http:" || url.protocol === "https:") {
-        await route.abort();
-      } else {
-        await route.fallback();
-      }
-    });
+    const { context, close } = await launchExtension(browserChannel, extensionBuild);
     await use(context);
-    await context.close();
-    rmSync(profile, { recursive: true, force: true });
+    await close();
   },
 
   extensionId: async ({ context }, use) => {
-    const sw = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker", { timeout: 15_000 }));
-    await use(new URL(sw.url()).host);
+    await use(await extensionIdOf(context));
   },
 
   gmail: async ({ context }, use) => {
