@@ -39,7 +39,7 @@ Not available yet.
 Requirements: Node.js 24 or later, npm, Git.
 
 ```bash
-git clone <repository-url> mail2code
+git clone https://github.com/gulshankundnani/mail2code.git mail2code
 ```
 
 ```bash
