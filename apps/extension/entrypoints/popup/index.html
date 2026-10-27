@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="manifest.default_title" content="Mail2Code">
+  <title>Mail2Code</title>
+  <link rel="stylesheet" href="../../assets/common.css">
+</head>
+<body class="popup">
+  <header class="popup-head">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 13H3.5A1.5 1.5 0 0 1 2 11.5v-7A1.5 1.5 0 0 1 3.5 3h13A1.5 1.5 0 0 1 18 4.5V10"/><path d="M2.5 4l7.5 5.5L17.5 4"/><path d="M16.5 14l-3 3 3 3"/><path d="M19.5 14l3 3-3 3"/></svg>
+    </span>
+    <div>
+      <h1>Mail2Code</h1>
+      <p class="tagline">Gmail conversations to Claude Code</p>
+    </div>
+  </header>
+  <nav aria-label="Mail2Code" class="tiles">
+    <button type="button" id="open-tasks" class="tile">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
+      <span class="tile-text"><span class="tile-title">Task dashboard</span><span class="tile-sub">Tasks, plans and approvals</span></span>
+    </button>
+    <button type="button" id="open-settings" class="tile">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4"/></svg>
+      <span class="tile-text"><span class="tile-title">Settings</span><span class="tile-sub">Destination, mode, API</span></span>
+    </button>
+  </nav>
+  <p class="hint">To send an email, open it in Gmail and click the envelope icon next to the subject (<strong>Send to Claude</strong>).</p>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

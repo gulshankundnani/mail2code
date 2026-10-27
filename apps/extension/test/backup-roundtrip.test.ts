@@ -1,8 +1,8 @@
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBackupText, previewImport, selectImport, validateExport, type ExportFile } from "@inbox-handoff/backup";
-import type { TaskCreate } from "@inbox-handoff/protocol";
+import { parseBackupText, previewImport, selectImport, validateExport, type ExportFile } from "@mail2code/backup";
+import type { TaskCreate } from "@mail2code/protocol";
 import { buildExportFile, toExportData, toImportOperation } from "../src/backup/mapping.ts";
 import { TaskRepo } from "../src/db/task-repo.ts";
 

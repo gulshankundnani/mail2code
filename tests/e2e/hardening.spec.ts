@@ -47,12 +47,14 @@ test("built manifests stay least-privilege with a strict CSP", async ({ extensio
     expect(m.permissions, dir).toEqual(["storage"]);
     expect(m.host_permissions ?? [], dir).toEqual([]);
     expect(m.optional_permissions ?? [], dir).toEqual([]);
+    expect(m.optional_host_permissions ?? [], dir).toEqual(["https://api.anthropic.com/*"]);
     expect(m.web_accessible_resources ?? [], dir).toEqual([]);
     expect(m.externally_connectable, dir).toBeUndefined();
     expect(m.content_scripts.map((c: { matches: string[] }) => c.matches).flat(), dir).toEqual(["https://mail.google.com/*"]);
     const csp: string = m.content_security_policy.extension_pages;
-    for (const directive of ["script-src 'self'", "connect-src 'none'", "object-src 'none'", "frame-ancestors 'none'"]) expect(csp, dir).toContain(directive);
-    expect(csp, dir).not.toMatch(/unsafe-(eval|inline)|https?:/);
+    for (const directive of ["script-src 'self'", "connect-src https://api.anthropic.com", "object-src 'none'", "frame-ancestors 'none'"]) expect(csp, dir).toContain(directive);
+    expect(csp, dir).not.toMatch(/unsafe-(eval|inline)/);
+    expect((csp.match(/https?:\/\/[^\s;]+/g) ?? []).filter((u) => u !== "https://api.anthropic.com"), dir).toEqual([]);
   }
 });
 

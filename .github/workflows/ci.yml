@@ -34,7 +34,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm run -w @inbox-handoff/extension build:all
+      - run: npm run -w @mail2code/extension build:all
       - run: npm run check:manifests
 
   e2e:
@@ -51,7 +51,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run -w @inbox-handoff/extension build:all
+      - run: npm run -w @mail2code/extension build:all
       # Edge is covered locally on Windows; CI runs Playwright's Chromium only.
       - run: npx playwright test --project chromium
       - if: failure()
@@ -84,7 +84,7 @@ jobs:
         run: npm run licenses:check
       - name: Firefox add-on lint
         run: |
-          npm run -w @inbox-handoff/extension build:firefox
+          npm run -w @mail2code/extension build:firefox
           npx --yes web-ext@10.8.0 lint --source-dir apps/extension/dist/firefox-mv3
 
   package:
@@ -101,7 +101,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run -w @inbox-handoff/extension zip:all
+      - run: npm run -w @mail2code/extension zip:all
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: extension-builds-${{ github.sha }}

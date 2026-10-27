@@ -1,11 +1,13 @@
 {
-  "name": "@inbox-handoff/protocol",
+  "name": "@mail2code/protocol",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./limits": "./src/limits.ts"
+    "./limits": "./src/limits.ts",
+    "./canonical": "./src/canonical.ts",
+    "./approval-seal": "./src/approval-seal.ts"
   },
   "dependencies": {
     "zod": "4.6.7"

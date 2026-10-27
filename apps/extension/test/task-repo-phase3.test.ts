@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import type { CapturedConversation, TaskCreate } from "@inbox-handoff/protocol";
+import type { CapturedConversation, TaskCreate } from "@mail2code/protocol";
 import { TaskRepo } from "../src/db/task-repo.ts";
 
 const DAY = 24 * 60 * 60 * 1000;

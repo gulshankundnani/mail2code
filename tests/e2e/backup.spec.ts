@@ -19,9 +19,9 @@ test("plain export has no email text by default; including it requires encryptio
   await expect(backup.locator("#task-total")).toHaveText("1");
 
   const plain = await downloadBackup(backup);
-  expect(plain.name).toMatch(/^inbox-handoff-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(plain.name).toMatch(/^mail2code-backup-\d{4}-\d{2}-\d{2}\.json$/);
   const file = JSON.parse(plain.text);
-  expect(file).toMatchObject({ format: "inbox-handoff-export", schemaVersion: 1, includesEmailContent: false });
+  expect(file).toMatchObject({ format: "mail2code-export", schemaVersion: 2, includesEmailContent: false });
   expect(file.data.tasks[0].title).toBe("Login accepts any password");
   expect(plain.text).not.toContain("accepts any password for the admin user"); // email body
 
@@ -101,7 +101,7 @@ test("damaged and foreign files are rejected without changing anything", async (
   await chooseFile(backup, "notes.json", "this is not json");
   await expect(backup.getByRole("status")).toContainText("isn't valid JSON");
   await chooseFile(backup, "other.json", JSON.stringify({ hello: "world" }));
-  await expect(backup.getByRole("status")).toContainText("isn't an Inbox Handoff backup");
+  await expect(backup.getByRole("status")).toContainText("isn't a Mail2Code backup");
   await expect(backup.locator("#preview")).toBeHidden();
 });
 

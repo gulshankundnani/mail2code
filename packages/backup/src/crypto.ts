@@ -5,7 +5,7 @@
 //          cipher parameters as additional authenticated data
 // The passphrase and key are never stored. A wrong passphrase or any change to
 // the file makes decryption fail.
-import { canonicalJson } from "@inbox-handoff/protocol";
+import { canonicalJson } from "@mail2code/protocol";
 import { ENCRYPTED_FORMAT, EncryptedFileSchema, type EncryptedFile } from "./format.ts";
 
 export const PBKDF2_ITERATIONS = 600_000;

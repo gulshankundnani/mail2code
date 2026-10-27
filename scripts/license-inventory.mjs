@@ -7,9 +7,12 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const RUNTIME_ALLOWED = new Set(["MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "0BSD"]);
+// Permissive licenses compatible with distributing the extension under MIT.
+// Unlicense (public-domain dedication, OSI-approved) is used by fast-sha256,
+// a dependency of the official Anthropic SDK.
+const RUNTIME_ALLOWED = new Set(["MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "0BSD", "Unlicense"]);
 const OUT = "docs/dependencies.md";
-const WORKSPACE_SCOPE = "@inbox-handoff/";
+const WORKSPACE_SCOPE = "@mail2code/";
 
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
 

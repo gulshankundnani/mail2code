@@ -4,12 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="manifest.open_in_tab" content="true">
-  <title>Tasks – Inbox Handoff</title>
+  <title>Tasks – Mail2Code</title>
   <link rel="stylesheet" href="../../assets/common.css">
 </head>
 <body>
   <main>
-    <h1>Inbox Handoff tasks</h1>
+    <h1>Mail2Code tasks</h1>
+    <nav class="page-nav" aria-label="Sections">
+      <a href="#h-tasks">Task dashboard</a>
+      <a href="#approved">Approved by me</a>
+      <a href="#settings">Settings</a>
+      <a href="#approvers">Approvers</a>
+      <a href="backup.html">Backup and import</a>
+    </nav>
     <div id="status" role="status" aria-live="polite"></div>
 
     <section aria-labelledby="h-tasks">
@@ -46,9 +53,158 @@
         <div class="filters-reset"><button type="reset" class="secondary">Clear</button></div>
       </form>
       <p id="count" class="meta" aria-live="polite"></p>
-      <p id="empty" class="hint" hidden>No tasks yet. Open an email in Gmail and click <strong>Send to Claude</strong>.</p>
+      <p id="empty" class="hint" hidden>No tasks yet. Open an email in Gmail and click the envelope icon next to the subject (<strong>Send to Claude</strong>).</p>
       <p id="no-match" class="hint" hidden>No tasks match these filters.</p>
       <ul id="tasks" class="task-list"></ul>
+    </section>
+
+    <section aria-labelledby="h-approved" id="approved">
+      <h2 id="h-approved">Approved by me</h2>
+      <p class="hint">
+        Plans you signed for other people, with the progress they report. Updates arrive by email: open one in Gmail and
+        click the Mail2Code icon next to the subject. Each update is checked against the requester's signature; the
+        status itself is what they recorded.
+      </p>
+      <div id="approved-status" role="status" aria-live="polite"></div>
+      <p class="hint" id="approved-empty">Nothing yet. Plans you approve with Mail2Code appear here.</p>
+      <ul id="approved-list" class="approved-list"></ul>
+    </section>
+
+    <section aria-labelledby="h-settings" id="settings">
+      <h2 id="h-settings">Settings</h2>
+      <form id="settings-form" novalidate inert>
+        <fieldset>
+          <legend>Where "Open in Claude" goes</legend>
+          <label for="destination">Default destination</label>
+          <select id="destination">
+            <option value="desktop">Claude app on this computer</option>
+            <option value="desktop-ssh">Claude app over SSH (remote machine)</option>
+            <option value="cli">Claude Code in a terminal</option>
+          </select>
+          <p class="hint">You can switch per email in the card. Links pre-fill the prompt; Claude never sends it until you press Enter.</p>
+
+          <label for="cli-folder">Terminal: project folder when the task has no GitHub repository (optional)</label>
+          <input id="cli-folder" placeholder="C:\Projects\my-app" autocomplete="off">
+          <p class="field-error" id="err-cliFolder" role="alert"></p>
+          <p class="hint">Terminal links need a one-time setup: run <code>claude</code> once and send any prompt, so your system knows how to open <code>claude-cli://</code> links.</p>
+
+          <div class="row">
+            <div>
+              <label for="ssh-host">SSH host (optional)</label>
+              <input id="ssh-host" placeholder="user@build.example.com" autocomplete="off">
+              <p class="field-error" id="err-sshHost" role="alert"></p>
+            </div>
+            <div>
+              <label for="ssh-port">SSH port</label>
+              <input id="ssh-port" inputmode="numeric" placeholder="22" autocomplete="off">
+              <p class="field-error" id="err-sshPort" role="alert"></p>
+            </div>
+          </div>
+          <label for="ssh-folder">SSH folder</label>
+          <input id="ssh-folder" placeholder="/srv/app or ~/app" autocomplete="off">
+          <p class="field-error" id="err-sshFolder" role="alert"></p>
+          <p class="hint">The Claude app asks you to confirm an SSH connection before it connects. Keys and passwords are never put in links.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Default mode and permissions</legend>
+          <label for="default-mode">Mode for new Claude Code sessions</label>
+          <select id="default-mode"></select>
+          <p class="hint">
+            Links can't choose a mode, so Claude Code reads it from its own settings file. Add this once to
+            <code>%USERPROFILE%\.claude\settings.json</code> (Windows) or <code>~/.claude/settings.json</code> (macOS/Linux),
+            merging it with anything already there. It applies to every new Claude Code session, not only ones started from email.
+            <strong>Plan mode</strong> means Claude can't edit files until you approve its plan.
+          </p>
+          <pre id="mode-snippet" tabindex="0"></pre>
+          <div class="actions"><button type="button" id="copy-snippet" class="secondary">Copy settings snippet</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Email analysis</legend>
+          <div id="engines"></div>
+          <div id="on-device-box">
+            <p class="hint" id="on-device-status"></p>
+            <div class="actions"><button type="button" id="prepare-on-device" class="secondary" hidden>Prepare on-device AI</button>
+              <button type="button" id="test-on-device" class="secondary" hidden>Test on-device AI</button></div>
+          </div>
+          <div id="api-box">
+            <p class="notice warn-box">
+              With the Claude API option, the cleaned email text (credentials redacted) is sent to Anthropic for each summary,
+              billed to your API key. Your key is stored only in this browser profile, used only by the extension's background
+              script, and never included in backups.
+            </p>
+            <label for="api-key">Anthropic API key</label>
+            <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+            <p class="hint" id="api-key-state"></p>
+            <label for="api-model">Model</label>
+            <select id="api-model"></select>
+            <p class="hint" id="api-permission-state"></p>
+            <div class="actions">
+              <button type="button" id="grant-api" class="secondary">Allow access to api.anthropic.com</button>
+              <button type="button" id="remove-key" class="secondary danger">Remove key</button>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="actions"><button type="submit" id="save-settings">Save settings</button></div>
+        <p id="settings-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section aria-labelledby="h-approvers" id="approvers">
+      <h2 id="h-approvers">Approvers</h2>
+      <p class="hint">
+        Let another person approve your plans, or approve plans for others. An approval is signed in the approver's own
+        browser, so Mail2Code can check that it really came from them and is for exactly that plan version. Requests and
+        replies travel as ordinary Gmail emails; the wording of an email never counts, only the signed data in it.
+      </p>
+
+      <fieldset>
+        <legend>My approver identity</legend>
+        <div id="identity-none">
+          <p class="hint">Create one if other people will ask you to approve their plans. Your signing key is created in this browser and can't be copied out of it, not even into a backup.</p>
+          <div class="row">
+            <div>
+              <label for="identity-name">Your name</label>
+              <input id="identity-name" maxlength="100" autocomplete="name">
+            </div>
+            <div>
+              <label for="identity-email">Your email address</label>
+              <input id="identity-email" type="email" maxlength="254" autocomplete="email">
+            </div>
+          </div>
+          <div class="actions"><button type="button" id="create-identity" disabled>Create my approver identity</button></div>
+        </div>
+        <div id="identity-some" hidden>
+          <p id="identity-label"></p>
+          <p class="hint">Your fingerprint. People who add you should check it with you directly, for example by phone:</p>
+          <p class="fingerprint" id="identity-fingerprint"></p>
+          <div class="actions">
+            <button type="button" id="email-card">Email my approver card</button>
+            <button type="button" id="copy-card" class="secondary">Copy card</button>
+            <button type="button" id="delete-identity" class="secondary danger">Delete my identity</button>
+          </div>
+          <p class="hint">To answer a request you received as a file, open <a id="approve-link" href="approve.html">Review an approval request</a>.</p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Trusted approvers</legend>
+        <ul id="approver-list" class="approver-list"></ul>
+        <p class="hint" id="no-approvers">No trusted approvers yet.</p>
+        <label for="approver-card-text">Add a trusted approver: paste their approver card</label>
+        <textarea id="approver-card-text" rows="3" spellcheck="false" placeholder='{"format":"mail2code-approver-card", …}'></textarea>
+        <label for="approver-card-file">…or choose a card file</label>
+        <input id="approver-card-file" type="file" accept=".json,application/json">
+        <div id="card-preview" hidden>
+          <p id="card-who"></p>
+          <p class="fingerprint" id="card-fingerprint"></p>
+          <label class="check"><input type="checkbox" id="card-confirm"> <span id="card-confirm-label">I checked this fingerprint with this person directly (in person or by phone).</span></label>
+          <div class="actions"><button type="button" id="add-approver" disabled>Add as trusted approver</button></div>
+        </div>
+        <p id="approvers-status" role="status" aria-live="polite"></p>
+      </fieldset>
     </section>
 
     <section aria-labelledby="h-retention">

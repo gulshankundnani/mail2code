@@ -1,5 +1,5 @@
 {
-  "name": "inbox-handoff",
+  "name": "mail2code",
   "private": true,
   "description": "Browser extension: send a Gmail conversation you choose to Claude, with a recorded approval step. Working name.",
   "type": "module",
@@ -11,10 +11,10 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json && tsc -p packages/gmail-extract/tsconfig.json && npm run -w @inbox-handoff/extension typecheck",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/gmail-extract/tsconfig.json && npm run -w @mail2code/extension typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run -w @inbox-handoff/extension build:all && playwright test",
+    "test:e2e": "npm run -w @mail2code/extension build:all && playwright test",
     "check:manifests": "node scripts/check-manifests.mjs",
     "scan:secrets": "node --disable-warning=ExperimentalWarning scripts/scan-secrets.mjs",
     "licenses": "node scripts/license-inventory.mjs",

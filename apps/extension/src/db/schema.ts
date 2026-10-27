@@ -1,8 +1,8 @@
-import type { BlockReason, Priority, TaskStatus } from "@inbox-handoff/protocol";
-import type { ApprovalRecord, PlanRecord } from "@inbox-handoff/task-core";
+import type { BlockReason, Priority, TaskStatus } from "@mail2code/protocol";
+import type { ApprovalRecord, GivenApproval, KeyHandle, PendingRequest, PlanRecord, TrustedApprover } from "@mail2code/task-core";
 
-export const DB_NAME = "inbox-handoff";
-export const DB_VERSION = 1;
+export const DB_NAME = "mail2code";
+export const DB_VERSION = 3;
 
 export interface SourceRef {
   messageId: string;
@@ -35,6 +35,22 @@ export interface TaskRecord {
   // Set when a context refresh added messages; compared with the latest plan's
   // time to warn that the plan may no longer fit. Absent on Phase 2 records.
   contextChangedAt?: number | null;
+  // Fingerprint of the one approver whose signed approval this task needs;
+  // when set, the user's own approval doesn't count. Absent before v2.
+  requiredApprover?: string | null;
+}
+
+// This browser's own approver identity (at most one, id "self"). The private
+// key is a non-extractable CryptoKey: IndexedDB stores it, but it can't be
+// read out, exported or included in a backup.
+export interface IdentityRecord {
+  id: "self";
+  name: string;
+  email: string;
+  publicKey: string;
+  fingerprint: string;
+  privateKey: KeyHandle;
+  createdAt: number;
 }
 
 // Email bodies live apart from tasks so they can be purged on their own.
@@ -49,8 +65,22 @@ export interface SnapshotRecord {
   purgedAt?: number | null;
 }
 
+// The requester key (at most one, id "self"): signs progress updates sent to
+// approvers. Created automatically with the first approval request; the
+// private key is non-extractable and never exported.
+export interface RequesterKeyRecord {
+  id: "self";
+  publicKey: string;
+  fingerprint: string;
+  privateKey: KeyHandle;
+  createdAt: number;
+}
+
 export interface SettingRecord {
-  key: "retentionDays";
+  // anthropicApiKey: the user's own key for the optional Claude API summary.
+  // Readable only by extension pages and the background (same origin); never
+  // exported, logged or sent to the content script.
+  key: "retentionDays" | "anthropicApiKey";
   value: unknown;
 }
 
@@ -62,7 +92,7 @@ export interface EventRecord {
   data: Record<string, unknown>;
 }
 
-export type { ApprovalRecord, PlanRecord };
+export type { ApprovalRecord, GivenApproval, PendingRequest, PlanRecord, TrustedApprover };
 
 export function upgrade(db: IDBDatabase, oldVersion: number): void {
   if (oldVersion < 1) {
@@ -76,5 +106,14 @@ export function upgrade(db: IDBDatabase, oldVersion: number): void {
     db.createObjectStore("approvals", { keyPath: "id" }).createIndex("taskId", "taskId");
     db.createObjectStore("events", { keyPath: "seq", autoIncrement: true }).createIndex("taskId", "taskId");
     db.createObjectStore("settings", { keyPath: "key" });
+  }
+  if (oldVersion < 2) {
+    db.createObjectStore("identity", { keyPath: "id" });
+    db.createObjectStore("approvers", { keyPath: "fingerprint" });
+    db.createObjectStore("approvalRequests", { keyPath: "requestId" }).createIndex("taskId", "taskId");
+  }
+  if (oldVersion < 3) {
+    db.createObjectStore("requesterKey", { keyPath: "id" });
+    db.createObjectStore("givenApprovals", { keyPath: "requestId" });
   }
 }

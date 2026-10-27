@@ -1,8 +1,8 @@
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import type { TaskCreate } from "@inbox-handoff/protocol";
-import { IllegalTransitionError } from "@inbox-handoff/task-core";
+import type { TaskCreate } from "@mail2code/protocol";
+import { IllegalTransitionError } from "@mail2code/task-core";
 import { TaskError, TaskRepo } from "../src/db/task-repo.ts";
 
 const repos: TaskRepo[] = [];

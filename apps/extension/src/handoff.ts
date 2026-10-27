@@ -1,5 +1,5 @@
-import { TaskCreateSchema, idempotencyMaterial, type CapturedConversation, type Priority, type TaskCreate } from "@inbox-handoff/protocol";
-import { sha256Hex } from "@inbox-handoff/task-core";
+import { TaskCreateSchema, idempotencyMaterial, type CapturedConversation, type Priority, type TaskCreate } from "@mail2code/protocol";
+import { sha256Hex } from "@mail2code/task-core";
 import { redactSecrets } from "./secrets.ts";
 
 export interface ReviewForm {

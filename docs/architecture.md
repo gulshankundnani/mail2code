@@ -1,6 +1,6 @@
 # Architecture
 
-Inbox Handoff is a single Manifest V3 browser extension. There is no server,
+Mail2Code is a single Manifest V3 browser extension. There is no server,
 native host, desktop app or account. It needs no configuration files or
 environment variables (so there is no `.env.example`).
 
@@ -23,7 +23,7 @@ environment variables (so there is no `.env.example`).
 │ task.html     brief, handoff, plan, approval, progress      │
 │ options.html  task list, filters, retention, integrations   │
 │ backup.html   export / import / encryption                  │
-│        └── IndexedDB "inbox-handoff" (TaskRepo)             │
+│        └── IndexedDB "mail2code" (TaskRepo)             │
 └───────────────┬─────────────────────────────────────────────┘
                 │ user actions only
      clipboard + new tab (claude.ai)        backup files (disk)
@@ -67,16 +67,27 @@ can't control Claude in claude.ai — see [claude-integrations.md](claude-integr
 
 ## Storage
 
-IndexedDB database `inbox-handoff` (version 1):
+IndexedDB database `mail2code` (version 3; older databases are upgraded in place):
 
 | Store | Key | Contents |
 |---|---|---|
 | `tasks` | `id` | Task metadata, Gmail references, handoff timestamps; indexes on `idempotencyKey` (unique), `threadId`, `status`, `updatedAt` |
 | `snapshots` | `taskId` | Stored email text, `closedAt` (retention clock), `purgedAt` |
 | `plans` | `id` | Versions with SHA-256 fingerprints |
-| `approvals` | `id` | Decisions; `origin` `local` or `imported`; `supersededAt` |
+| `approvals` | `id` | Decisions; `origin` `local`, `signed` (another person's verified response, with `signedBy`) or `imported`; `supersededAt` |
 | `events` | auto | Append-only history |
-| `settings` | `key` | `retentionDays` |
+| `settings` | `key` | `retentionDays`, `anthropicApiKey` |
+| `identity` | `id` (`self`) | v2. This browser's approver identity: name, email, public key, fingerprint and a **non-extractable** ECDSA P-256 private key |
+| `approvers` | `fingerprint` | v2. Trusted approvers (public keys); `confirmedAt` is null until the user confirms the fingerprint |
+| `approvalRequests` | `requestId` | v2. Requests sent from this browser: task, plan version and fingerprint, approver, expiry, `usedAt` (single use), `updateSeq` (last progress update); index on `taskId` |
+| `requesterKey` | `id` (`self`) | v3. Non-extractable key that signs progress updates; its public part goes into approval requests |
+| `givenApprovals` | `requestId` | v3. The approver's "Approved by me" list: what they signed, the requester's key, and the progress updates received |
+
+Approval by another person ([approvals.md](approvals.md)) adds one route
+from the Gmail content script, `approval.block`. After a real click on the
+approval card, it hands a sealed block to the background, which keeps it in
+`storage.session` and opens `approve.html` (requests) or the task page
+(responses). Signing and recording happen only on those extension pages.
 
 Writes that touch several stores run in one transaction (`inTx`), so a failure
 leaves nothing half-written. The export format in

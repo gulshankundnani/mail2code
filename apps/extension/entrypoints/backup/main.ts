@@ -12,8 +12,8 @@ import {
   type ExportFile,
   type ImportPreview,
   type ImportStrategy,
-} from "@inbox-handoff/backup";
-import { STATUS_LABELS } from "@inbox-handoff/task-core";
+} from "@mail2code/backup";
+import { STATUS_LABELS } from "@mail2code/task-core";
 import { browser } from "wxt/browser";
 import { buildExportFile, toExportData, toImportOperation } from "../../src/backup/mapping.ts";
 import type { TaskRecord } from "../../src/db/schema.ts";
@@ -71,9 +71,9 @@ async function doExport() {
     if (encrypt) {
       setStatus("Encrypting…");
       const enc = await encryptText(json, $<HTMLInputElement>("passphrase").value);
-      download(`inbox-handoff-backup-${date}-encrypted.json`, JSON.stringify(enc));
+      download(`mail2code-backup-${date}-encrypted.json`, JSON.stringify(enc));
     } else {
-      download(`inbox-handoff-backup-${date}.json`, json);
+      download(`mail2code-backup-${date}.json`, json);
     }
     $<HTMLInputElement>("passphrase").value = "";
     $<HTMLInputElement>("passphrase2").value = "";
@@ -182,7 +182,7 @@ async function decrypt() {
     // The decrypted text stays in memory only; nothing is written to disk.
     const parsed = parseBackupText(await decryptText(pendingEncrypted, $<HTMLInputElement>("import-passphrase").value));
     $<HTMLInputElement>("import-passphrase").value = "";
-    if (parsed.kind !== "plain") throw new BackupError("not_a_backup", "The decrypted content isn't an Inbox Handoff backup.");
+    if (parsed.kind !== "plain") throw new BackupError("not_a_backup", "The decrypted content isn't a Mail2Code backup.");
     await showPreview(parsed.raw);
     $("decrypt-fields").hidden = true;
     setStatus("Backup decrypted and checked. Review it below, then choose how to import it.");

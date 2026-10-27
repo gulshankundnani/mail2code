@@ -1,9 +1,9 @@
-# Inbox Handoff
+# Mail2Code
 
 A browser extension that turns a Gmail conversation you choose into a task
 brief for Claude, and keeps track of the plan you approve.
 
-> **Working name.** Inbox Handoff is an independent open-source project. It is
+> **Working name.** Mail2Code is an independent open-source project. It is
 > not made, endorsed or supported by Anthropic or Google.
 
 ## What it does — and doesn't
@@ -11,23 +11,22 @@ brief for Claude, and keeps track of the plan you approve.
 | It does | It doesn't |
 |---|---|
 | Add a **Send to Claude** button to Gmail | Read your inbox in the background, poll, or watch for replies |
-| Capture the open message or conversation **only when you click** | Send anything over the network (extension pages can't make network requests) |
-| Show exactly what will be saved before anything is saved | Detect, start or control Claude Code on your computer — browser extensions can't run programs |
-| Build a brief that marks email text as untrusted and asks Claude to plan first | Enforce your approval on Claude's side: it **records** your decision, but can't stop Claude in claude.ai from acting |
-| Copy the brief and open claude.ai; you paste and send it | Fill in claude.ai for you or put email text in a URL |
-| Track tasks, plans, decisions and history in your browser | Require a server, account, desktop app or anything besides the extension |
-| Redact likely credentials, delete old email text, export and import your data | Collect analytics or telemetry |
+| Analyse the open message or conversation **on your computer, only when you click** | Send whole email texts anywhere |
+| Open **Claude Code on your computer** — the Claude app (local or SSH) or a terminal — with a new session and the prompt filled in, using Claude's official `claude://` / `claude-cli://` links | Send the prompt for you: Claude's apps always wait for you to press Enter (by design) |
+| Recommend Claude Code's **plan mode** (Settings generates the setting), so Claude can't edit files until you approve its plan | Set Claude Code's mode or permissions from a link — links can't carry them |
+| Redact likely credentials and mark email content as untrusted | Detect whether Claude is installed |
+| Optionally add a summary from Chrome's on-device AI or the Claude API (your key, off by default) | Contact any server unless you turn on Claude API summaries — then only `api.anthropic.com` |
+| Track tasks, export and import your data | Require a server, account or companion app besides Claude itself |
+| Let another person approve a plan by email, with a **signature** Mail2Code verifies ([how](docs/approvals.md)) | Treat the wording of an email as an approval |
 
 ## How it works
 
-1. Open a conversation in Gmail and click **Send to Claude**.
-2. Review what was captured — one message or the whole conversation — and add instructions and an optional repository URL. Click **Create task**. It's saved in this browser only.
-3. On the task page, **Copy brief**, **Open Claude** (claude.ai/code for GitHub repositories, otherwise a new chat), paste and send.
-4. When Claude replies with a plan, paste it into **Record plan**.
-5. **Approve**, **Request changes** or **Reject**. Your decision is tied to that exact plan version and fingerprint; a changed plan needs a fresh approval.
-6. Copy the approval message back to Claude yourself, then record progress as it happens.
+1. Open a conversation in Gmail and click the **Send to Claude** button: the envelope-with-`</>` icon next to the subject.
+2. A preview card shows the **analysis** — requests, decisions, deadlines, questions — and the exact prompt (under 5,000 characters). Optionally pick the latest message or the whole thread, the destination, a repository, and add instructions.
+3. Click **Open in Claude**. Your browser hands the link to Claude on your computer (the first time it asks for permission), and a new Claude Code session opens with the prompt filled in. The task is saved in your task list.
+4. Read the prompt in Claude and press **Enter**. With plan mode set (Settings → *Default mode and permissions*), Claude proposes a plan and can't change files until you approve it in Claude Code.
 
-New replies in Gmail? Click **Send to Claude** again and choose **Add to an existing task** — only new messages are added, and an already-approved task goes back to review.
+One-time setup: install the Claude app (or Claude Code), and for terminal links run `claude` once and send any prompt. **More options…** on the card opens the full review page (copy-and-paste flow, task tracking).
 
 ## Install
 
@@ -40,11 +39,11 @@ Not available yet.
 Requirements: Node.js 24 or later, npm, Git.
 
 ```bash
-git clone <repository-url> inbox-handoff
+git clone <repository-url> mail2code
 ```
 
 ```bash
-cd inbox-handoff
+cd mail2code
 ```
 
 ```bash
@@ -52,7 +51,7 @@ npm ci
 ```
 
 ```bash
-npm run -w @inbox-handoff/extension build:all
+npm run -w @mail2code/extension build:all
 ```
 
 Then load the build for your browser — see [docs/installation.md](docs/installation.md):
@@ -77,10 +76,12 @@ Details and evidence: [docs/browser-compatibility.md](docs/browser-compatibility
 
 ## Privacy
 
-Everything stays in your browser. The extension has one permission
-(`storage`) plus a content script on `mail.google.com`. Email text is kept only
-with its task and deleted 30 days after the task closes by default. Only what
-you paste into Claude leaves your browser. See
+Analysis happens on your computer. The extension has one permission
+(`storage`), a content script on `mail.google.com`, and one **optional** host
+permission (`api.anthropic.com`) that's only requested if you turn on Claude API
+summaries. The prompt goes to Claude on your computer through a local link; Claude
+sends nothing until you press Enter. Email text kept with tasks is deleted 30 days
+after a task closes by default. See
 [docs/permissions-and-privacy.md](docs/permissions-and-privacy.md).
 
 ## Development
@@ -107,8 +108,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 - [Claude integrations: what an extension can and cannot do](docs/claude-integrations.md)
 - [Permissions and privacy](docs/permissions-and-privacy.md) · [Threat model](docs/threat-model.md)
 - [Data portability](docs/data-portability.md) · [Backup format](docs/backup-format.md)
+- [User guide (with screenshots)](docs/user-guide.md) · [Approval by another person](docs/approvals.md)
 - [Browser compatibility](docs/browser-compatibility.md) · [Dependencies](docs/dependencies.md)
-- [Release process](docs/release-process.md) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md)
+- [Release process](docs/release-process.md) · [Release readiness](docs/release-readiness.md) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md)
 
 ## License
 

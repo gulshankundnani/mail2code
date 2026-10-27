@@ -1,48 +1,53 @@
-# Claude integrations: what an extension can and cannot do
+# Claude integrations: what the extension can and cannot do
 
 Last reviewed 2026-10-24.
 
-| Integration | Status | Why |
-|---|---|---|
-| Claude Code on the user's computer | **Unknown — cannot verify from the browser** | Extensions cannot run programs, read the PATH or inspect files. Reaching a local CLI needs native messaging, which requires installing a separate program, which this project rules out. |
-| Browser handoff (default) | **Available** | Copy brief to clipboard, open `claude.ai/code` (GitHub repositories) or `claude.ai/new`. The user pastes and sends. No task content is put in the URL. |
-| Claude Managed Agents (optional) | **Not built — no-go as designed** | See probe below. |
+## How "Open in Claude" reaches Claude Code on your computer
 
-## Approval gate: what is and isn't enforced
+The extension can't run programs. Instead it uses the **links that Claude's own apps register with your operating system** (like `mailto:` opens your mail app). Both formats are documented by Anthropic:
 
-With the browser handoff the extension **cannot see or control** the Claude
-conversation. It enforces its own records only:
+| Destination | Link | Documented in | Status |
+|---|---|---|---|
+| **Claude app** (desktop, Code) | `claude://code/new?q=<prompt>` | code.claude.com/docs/en/desktop — "Open an SSH session from a link" | **Verified on the owner's Windows PC:** opens a new local session with the prompt filled in, not sent |
+| **Claude app over SSH** | `claude://code/new?ssh_host=…&ssh_port=…&ssh_folder=…&q=…` | same | Built; not tested (needs an SSH host). The app asks you to confirm the connection first |
+| **Claude Code in a terminal** | `claude-cli://open?q=…&repo=owner/name` or `&cwd=<absolute folder>` | code.claude.com/docs/en/deep-links | Built; not tested here (the handler isn't registered on the dev PC). One-time setup: run `claude` once and send any prompt |
 
-- A decision is bound to the exact plan version and SHA-256 fingerprint the
-  user was looking at; a tab showing an older plan cannot approve a newer one.
-- Recording a changed plan supersedes earlier approvals.
-- "Implementation started" can only be recorded after a current, local
-  approval. Imported approvals never count.
+What always happens, by design of Claude's apps and your browser:
 
-It does **not** prevent Claude in claude.ai from acting before approval. The
-UI says so on the task page, and the brief asks Claude to wait — a request,
-not a control.
+- **The prompt is pre-filled, never sent automatically.** You read it and press Enter. Claude Code also shows "Prompt from an external link" under the input box.
+- **Your browser asks before opening an external app** the first time (you can tick "Always allow").
+- **The extension can't tell whether Claude opened.** If nothing happens, the app isn't installed or the link handler isn't registered.
+- `claude-cli://` prompts are limited to **5,000 characters**; the extension keeps prompts under 4,500 for both destinations.
 
-## Managed Agents probe (2026-10-24)
+## What goes into the prompt
 
-`tests/probe/managed-agents-probe.mjs` sent two unauthenticated requests (no
-API key, body `{}`) to `POST https://api.anthropic.com/v1/agents` from a real
-extension page (`chrome-extension://` origin), with and without the
-`anthropic-dangerous-direct-browser-access: true` header. All other hosts were
-blocked.
+Not the whole email. The extension **analyses the thread on your computer** (`packages/analysis`):
 
-| Attempt | Result |
-|---|---|
-| Without the header | `net::ERR_FAILED` — no readable response |
-| With the header | `net::ERR_FAILED` — no readable response |
+1. Removes quoted earlier messages, signatures and legal disclaimers.
+2. Redacts likely credentials (on by default).
+3. Extracts requests, decisions, deadlines, open questions, links and attachment names, each attributed to its sender and date.
+4. Optionally adds a short summary — from **Chrome's on-device AI** (stays on your computer; only used if the model is already downloaded) or the **Claude API** (opt-in; sends the cleaned text to Anthropic with your own key).
+5. Composes a structured prompt with the email extract fenced as **untrusted**, plus the instruction to propose a plan first and wait for approval.
 
-The hostname resolved (the failure is not `ERR_NAME_NOT_RESOLVED`), so the
-browser blocked the response — consistent with a cross-origin (CORS)
-rejection of extension origins.
+Rule-based extraction is deterministic and works best for English. It finds candidate sentences; it doesn't understand the email.
 
-**Verdict:** not usable from an extension page without a host permission. A
-future version would need `optional_host_permissions: ["https://api.anthropic.com/*"]`
-granted by the user at runtime, and an authenticated test with the user's own
-API key, to confirm the API accepts the request and that tool restrictions
-(`enabled: false`, `permission_policy: always_ask`) behave as documented.
-That is a product decision and has not been started.
+## Approval
+
+The extension can't control Claude Code's behaviour from a link: neither link format accepts a mode or permissions. Two layers remain:
+
+- **Claude Code's own setting `permissions.defaultMode`.** Settings → *Default mode and permissions* generates the snippet. With **`plan`**, every new session starts in plan mode: Claude Code can read and plan but **can't edit files until you approve the plan in Claude Code** — enforced by Claude Code itself. (It applies to all new Claude Code sessions, not only email ones.)
+- **The prompt** asks Claude to plan first and to get separate permission for email, deployment, publishing and deletion — a request, not a control.
+
+The task page still records plans and decisions for your own tracking; those records don't control Claude.
+
+## Claude API (optional summaries)
+
+- Off by default. Settings → *Email analysis* → *Claude API summary*.
+- Your own Anthropic API key; billed to it. Default model `claude-opus-5-5` (Sonnet 5.5 and Haiku 5.5 selectable), effort `low`, server-side refusal fallback for Opus/Sonnet.
+- Uses the official `@anthropic-ai/sdk` from the extension's background script only.
+- Needs **"Allow access to api.anthropic.com"** (an optional browser permission requested from Settings; **Remove key** withdraws it again).
+- **Not tested against the live API** — no key was available during development.
+
+## Managed Agents
+
+An earlier probe showed cross-origin requests from an extension page without host permission are blocked (see git history of this file). The Claude API option above now uses an optional host permission instead; Managed Agents integration remains unbuilt.

@@ -1,5 +1,5 @@
-import type { CapturedConversation, CapturedMessage } from "@inbox-handoff/protocol";
-import { LIMITS } from "@inbox-handoff/protocol/limits";
+import type { CapturedConversation, CapturedMessage } from "@mail2code/protocol";
+import { LIMITS } from "@mail2code/protocol/limits";
 import { SELECTORS, isHidden, queryAllFirstMatching, queryFirst } from "./selectors.ts";
 import { elementToText } from "./text.ts";
 
@@ -88,12 +88,12 @@ export function extractConversation(doc: Document, href: string, now: Date = new
 
   const all = queryAllFirstMatching(conv.root, SELECTORS.message).filter((m) => !isHidden(m));
   const messages: CapturedMessage[] = [];
-  let collapsed = olderCollapsedCount(conv.root);
+  let bodyless = 0;
   const seen = new Set<string>();
   for (const m of all) {
     const body = queryFirst(m, SELECTORS.body);
     if (!body) {
-      collapsed++;
+      bodyless++;
       continue;
     }
     const messageId = cleanId(m.getAttribute("data-message-id")) ?? cleanId(m.getAttribute("data-legacy-message-id"));
@@ -106,6 +106,14 @@ export function extractConversation(doc: Document, href: string, now: Date = new
   }
   if (messages.length === 0) return { ok: false, error: "no_expanded_messages" };
   if (messages.length > LIMITS.maxMessagesPerHandoff) return { ok: false, error: "too_many_messages" };
+
+  // Collapsed messages: rows without rendered text, counted at the row level
+  // too (real Gmail may not mark collapsed rows like expanded ones), plus the
+  // "N older messages" bar.
+  const rows = queryAllFirstMatching(conv.root, SELECTORS.messageRow).filter((r) => !isHidden(r));
+  const topRows = rows.filter((r) => !rows.some((o) => o !== r && o.contains(r)));
+  const rowsWithoutText = topRows.filter((r) => !queryFirst(r, SELECTORS.body)).length;
+  const collapsed = olderCollapsedCount(conv.root) + Math.max(bodyless, rowsWithoutText);
 
   // Every field is bounded above, so no schema library is bundled into the
   // content script. The background script re-validates the whole capture

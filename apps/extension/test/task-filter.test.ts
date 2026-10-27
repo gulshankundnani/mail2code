@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TaskStatus } from "@inbox-handoff/protocol";
+import type { TaskStatus } from "@mail2code/protocol";
 import type { TaskRecord } from "../src/db/schema.ts";
 import { EMPTY_QUERY, filterTasks, queryFromParams, queryToParams, type TaskQuery } from "../src/task-filter.ts";
 

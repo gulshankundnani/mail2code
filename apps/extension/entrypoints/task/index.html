@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Task – Inbox Handoff</title>
+  <title>Task – Mail2Code</title>
   <link rel="stylesheet" href="../../assets/common.css">
 </head>
 <body>
@@ -52,8 +52,9 @@
     <section id="step-approve" aria-labelledby="h-approve">
       <h2 id="h-approve">3. Approve or reject the plan</h2>
       <p class="notice warn-box" id="enforcement-notice">
-        Your decision is recorded here, tied to this exact plan version. The extension <strong>can't stop</strong> Claude
-        in claude.ai from acting before you approve, and can't see what it does. After deciding, tell Claude yourself.
+        Decisions are recorded here, tied to this exact plan version. The extension <strong>can't stop</strong> Claude
+        from acting before approval, and can't see what it does; Claude Code's Plan mode is what holds it back. After a
+        decision, tell Claude yourself.
       </p>
       <div id="current-plan" hidden>
         <p class="meta" id="plan-meta"></p>
@@ -65,7 +66,41 @@
           <button type="button" id="request-changes" class="secondary" disabled>Request changes</button>
           <button type="button" id="reject" class="secondary" disabled>Reject</button>
         </div>
+        <p class="hint" id="required-hint" hidden></p>
         <div class="actions"><button type="button" id="copy-approval" class="secondary" hidden>Copy approval message for Claude</button></div>
+
+        <div class="subsection" id="ask-box">
+          <h3>Ask someone else to approve</h3>
+          <p class="hint" id="no-approvers-hint" hidden>Add the person in <a id="approvers-link" href="#">Settings → Approvers</a> first.</p>
+          <div id="ask-form">
+            <div class="row">
+              <div>
+                <label for="approver-select">Approver</label>
+                <select id="approver-select"></select>
+              </div>
+              <div>
+                <label for="requester-name">Your name (shown to them)</label>
+                <input id="requester-name" maxlength="100" autocomplete="name">
+              </div>
+            </div>
+            <div class="actions">
+              <button type="button" id="ask-approval" disabled>Ask by email</button>
+              <button type="button" id="download-request" class="secondary" disabled>Download request file</button>
+            </div>
+          </div>
+          <ul id="request-list" class="request-list"></ul>
+
+          <label for="required-approver">Whose approval counts for this task</label>
+          <select id="required-approver"></select>
+
+          <h3>Record a response</h3>
+          <p class="hint" id="inbox-hint" hidden>A response was opened from Gmail. Check it and record it below.</p>
+          <label for="response-text">Approval response</label>
+          <textarea id="response-text" rows="3" spellcheck="false" placeholder="-----BEGIN MAIL2CODE APPROVAL RESPONSE-----"></textarea>
+          <label for="response-file">…or choose a response file</label>
+          <input id="response-file" type="file" accept=".json,application/json,.txt">
+          <div class="actions"><button type="button" id="import-response" class="secondary" disabled>Check and record</button></div>
+        </div>
       </div>
       <p class="hint" id="no-plan">No plan recorded yet.</p>
     </section>
@@ -83,6 +118,15 @@
       </div>
       <label for="note">Add a progress note</label>
       <div class="row"><input id="note" maxlength="5000"><button type="button" id="add-note" class="secondary" disabled>Add note</button></div>
+
+      <div class="subsection" id="update-box" hidden>
+        <h3 id="update-title">Keep your approver informed</h3>
+        <p class="notice" id="update-offer" hidden></p>
+        <p class="hint">Sends the task's current status, signed so only you can update their "Approved by me" list. A Gmail draft opens; nothing is sent until you press Send.</p>
+        <label for="update-note">Note for them (optional)</label>
+        <input id="update-note" maxlength="5000" placeholder="e.g. Pull request opened">
+        <div class="actions"><button type="button" id="send-update">Send progress update</button></div>
+      </div>
     </section>
 
     <section aria-labelledby="h-context">

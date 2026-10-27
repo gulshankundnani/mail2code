@@ -7,7 +7,7 @@
   button is hidden on purpose because the right one can't be identified.
 - Reload the Gmail tab after installing or updating the extension.
 - Firefox: check the add-on is allowed on `mail.google.com` (Add-ons and
-  themes → Inbox Handoff → Permissions).
+  themes → Mail2Code → Permissions).
 - Gmail changes its page structure from time to time. If none of the above
   helps, please open an issue: the selectors in
   `packages/gmail-extract/src/selectors.ts` may need updating.
@@ -65,7 +65,7 @@ backup you imported didn't include it. Open the conversation in Gmail, click
 
 | Message | What to do |
 |---|---|
-| "isn't valid JSON" / "isn't an Inbox Handoff backup" | Choose the file the extension exported (`inbox-handoff-backup-….json`). |
+| "isn't valid JSON" / "isn't a Mail2Code backup" | Choose the file the extension exported (`mail2code-backup-….json`). |
 | "Wrong passphrase, or the file has been changed or damaged" | Check the passphrase. A modified encrypted file can't be opened. |
 | "checksum doesn't match" | The file is damaged or incomplete; export again. |
 | "made by a newer version" | Update the extension, then import. |

@@ -1,4 +1,4 @@
-import { CapturedConversationSchema, type CapturedConversation } from "@inbox-handoff/protocol";
+import { CapturedConversationSchema, type CapturedConversation } from "@mail2code/protocol";
 import type { DraftStore } from "./router.ts";
 
 export const DRAFT_TTL_MS = 60 * 60 * 1000;

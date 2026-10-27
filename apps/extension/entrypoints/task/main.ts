@@ -1,13 +1,24 @@
-import type { TaskStatus } from "@inbox-handoff/protocol";
-import { STATUS_LABELS, allowedTargets, type PlanRecord } from "@inbox-handoff/task-core";
+import type { TaskStatus } from "@mail2code/protocol";
+import { STATUS_LABELS, allowedTargets, type PendingRequest, type PlanRecord, type TrustedApprover } from "@mail2code/task-core";
 import { browser } from "wxt/browser";
+import { PROGRESS_LABELS, downloadText, readResponse, requestSubject, sealRequest, sealUpdate, updateSubject } from "../../src/approval-blocks.ts";
+import type { ApprovalBlock } from "../../src/approval-inbox.ts";
 import { buildBrief, buildContextUpdate, handoffDestination } from "../../src/brief.ts";
 import type { EventRecord, SnapshotRecord, TaskRecord } from "../../src/db/schema.ts";
 import { TaskRepo } from "../../src/db/task-repo.ts";
+import { composeOrPaste, gmailAccountOf } from "../../src/gmail-compose.ts";
+import type { PageMessage, Reply } from "../../src/messages.ts";
 import { $, el, errorText, formatTime, setStatus } from "../../src/ui.ts";
 
-const taskId = new URLSearchParams(location.search).get("id") ?? "";
+const params = new URLSearchParams(location.search);
+const taskId = params.get("id") ?? "";
+const inboxId = params.get("inbox") ?? "";
+const send = (msg: PageMessage) => browser.runtime.sendMessage(msg) as Promise<Reply>;
+const REQUESTER_NAME_KEY = "mail2code.requesterName";
 let repo: TaskRepo;
+let approvers: TrustedApprover[] = [];
+// Status at the previous render: a change offers to tell the approver (D8).
+let shownStatus: TaskStatus | null = null;
 let task: TaskRecord | null = null;
 let latestPlan: PlanRecord | null = null;
 let snapshot: SnapshotRecord | null = null;
@@ -21,6 +32,15 @@ const BLOCK_REASON_TEXT: Record<string, string> = {
   blocked_by_user: "Blocked by you.",
   context_changed: "New email messages arrived after approval: review the plan again.",
 };
+
+const DECISION_VERB: Record<string, string> = { approve: "Approved", reject: "Rejected", request_changes: "Changes requested" };
+
+function requestState(r: PendingRequest): string {
+  if (r.usedAt) return `answered ${formatTime(r.usedAt)}`;
+  if (latestPlan && r.planId !== latestPlan.id) return "out of date (the plan changed)";
+  if (r.expiresAt < Date.now()) return "expired";
+  return `waiting for a reply until ${formatTime(r.expiresAt)}`;
+}
 
 function eventText(e: EventRecord): string {
   const d = e.data;
@@ -39,6 +59,14 @@ function eventText(e: EventRecord): string {
     }
     case "context.purged":
       return d.reason === "retention" ? "Stored email text deleted (retention setting)" : "Stored email text deleted by you";
+    case "approval.requested":
+      return `Approval of plan v${String(d.planVersion)} requested from ${String(d.approver)}`;
+    case "approval.signed":
+      return `${DECISION_VERB[String(d.decision)] ?? String(d.decision)} by ${String(d.approver)}, plan v${String(d.planVersion)} (signature verified)`;
+    case "progress.sent":
+      return `Progress update #${String(d.seq)} prepared for ${String(d.approver)} (${PROGRESS_LABELS[d.status as TaskStatus] ?? String(d.status)})`;
+    case "approval.requirement":
+      return d.approver ? `Only ${String(d.approver)}'s signed approval counts from now on` : "Anyone's approval counts again, including yours";
     default:
       return e.type;
   }
@@ -48,6 +76,7 @@ const can = (to: TaskStatus, cause: "user_action" | "user_approval" = "user_acti
 
 async function render() {
   task = await repo.getTask(taskId);
+  approvers = await repo.listApprovers();
   if (!task) {
     setStatus("This task doesn't exist (it may have been deleted).", "error");
     document.querySelectorAll("section").forEach((s) => (s.hidden = true));
@@ -71,7 +100,7 @@ async function render() {
     ? `New email messages were added after plan version ${latestPlan!.version} was recorded. Check whether the plan still fits, and record a revised plan if it doesn't.`
     : "New email messages were added after you handed the brief to Claude. Send Claude the update below.";
 
-  document.title = `${task.title} – Inbox Handoff`;
+  document.title = `${task.title} – Mail2Code`;
   $("title").textContent = task.title;
   $("status-label").textContent = STATUS_LABELS[task.status];
   $("status-label").dataset.status = task.status;
@@ -104,9 +133,57 @@ async function render() {
     $("plan-view").textContent = latestPlan.text;
   }
   const awaiting = task.status === "AwaitingApproval" && !!latestPlan;
+  const required = task.requiredApprover ? approvers.find((a) => a.fingerprint === task!.requiredApprover) : undefined;
   for (const id of ["approve", "request-changes", "reject"]) $<HTMLButtonElement>(id).disabled = !awaiting;
-  const current = approvals.filter((a) => a.decision === "approve" && a.supersededAt === null && a.origin === "local" && a.planId === latestPlan?.id).at(-1);
+  if (task.requiredApprover) $<HTMLButtonElement>("approve").disabled = true;
+  $("required-hint").hidden = !task.requiredApprover;
+  $("required-hint").textContent = `Only ${required?.name ?? "the required approver"}'s signed approval counts for this task. You can still request changes or reject.`;
+  const current = approvals.filter((a) => a.decision === "approve" && a.supersededAt === null && a.origin !== "imported" && a.planId === latestPlan?.id).at(-1);
   $("copy-approval").hidden = !current;
+  if (task.status === "Approved" && current?.origin === "signed" && current.signedBy) {
+    $("status-label").textContent = `Approved by ${current.signedBy.name} (signature verified)`;
+  }
+
+  // Approval by another person
+  const confirmed = approvers.filter((a) => a.confirmedAt !== null);
+  $("no-approvers-hint").hidden = confirmed.length > 0;
+  $("ask-form").hidden = confirmed.length === 0;
+  const pick = $<HTMLSelectElement>("approver-select");
+  const picked = pick.value;
+  pick.replaceChildren(...confirmed.map((a) => Object.assign(el("option", `${a.name} <${a.email}>`), { value: a.fingerprint })));
+  if (confirmed.some((a) => a.fingerprint === picked)) pick.value = picked;
+  else if (required) pick.value = required.fingerprint;
+  $<HTMLButtonElement>("ask-approval").disabled = !awaiting || confirmed.length === 0;
+  $<HTMLButtonElement>("download-request").disabled = !awaiting || confirmed.length === 0;
+  const reqSel = $<HTMLSelectElement>("required-approver");
+  reqSel.replaceChildren(
+    Object.assign(el("option", "Anyone, including me"), { value: "" }),
+    ...confirmed.map((a) => Object.assign(el("option", `Only ${a.name} (signed approval)`), { value: a.fingerprint })),
+  );
+  reqSel.value = task.requiredApprover ?? "";
+  const requests = await repo.getApprovalRequests(taskId);
+  const nameOf = (fp: string) => approvers.find((a) => a.fingerprint === fp)?.name ?? "a removed approver";
+  $("request-list").replaceChildren(
+    ...requests
+      .slice()
+      .reverse()
+      .map((r) => el("li", `Sent to ${nameOf(r.approverFingerprint)} for plan v${r.planVersion} on ${formatTime(r.createdAt)} · ${requestState(r)}`)),
+  );
+  $<HTMLButtonElement>("import-response").disabled = !$<HTMLTextAreaElement>("response-text").value.trim();
+
+  // Progress updates for the person who approved this task
+  const recipient = await repo.progressRecipient(taskId);
+  $("update-box").hidden = !recipient;
+  if (recipient) {
+    const name = recipient.approver.name;
+    $("update-title").textContent = `Keep ${name} informed`;
+    $("send-update").textContent = `Send progress update to ${name}`;
+    if (shownStatus !== null && shownStatus !== task.status) {
+      $("update-offer").textContent = `The status is now "${PROGRESS_LABELS[task.status]}". Let ${name} know?`;
+      $("update-offer").hidden = false;
+    }
+  }
+  shownStatus = task.status;
 
   // 4. Progress
   $<HTMLButtonElement>("report-started").disabled = task.status !== "Approved";
@@ -157,7 +234,8 @@ async function render() {
         for (const a of decisions) {
           const verb = a.decision === "approve" ? "Approved" : a.decision === "reject" ? "Rejected" : "Changes requested";
           const notes = [a.origin === "imported" ? "imported, history only" : "", a.supersededAt ? `no longer current since ${formatTime(a.supersededAt)}` : ""].filter(Boolean).join("; ");
-          li.append(el("div", `${verb} ${formatTime(a.decidedAt)}${a.comment ? ` — “${a.comment}”` : ""}${notes ? ` (${notes})` : ""}`, "meta"));
+          const who = a.signedBy ? ` by ${a.signedBy.name}${a.origin === "signed" ? " (signature verified)" : ""}` : a.origin === "local" ? " by you" : "";
+          li.append(el("div", `${verb}${who} ${formatTime(a.decidedAt)}${a.comment ? ` — “${a.comment}”` : ""}${notes ? ` (${notes})` : ""}`, "meta"));
         }
         return li;
       }),
@@ -271,6 +349,102 @@ async function init() {
       setStatus(errorText(err), "error");
     }
   });
+
+  // ---- approval by another person ----
+  $<HTMLAnchorElement>("approvers-link").href = browser.runtime.getURL("/options.html#approvers");
+  const nameInput = $<HTMLInputElement>("requester-name");
+  nameInput.value = localStorage.getItem(REQUESTER_NAME_KEY) ?? (await repo.getIdentity())?.name ?? "";
+  nameInput.addEventListener("change", () => localStorage.setItem(REQUESTER_NAME_KEY, nameInput.value.trim()));
+  const newRequest = () => repo.createApprovalRequest(taskId, $<HTMLSelectElement>("approver-select").value, nameInput.value);
+
+  action("ask-approval", async () => {
+    const request = await newRequest();
+    const approver = approvers.find((a) => a.fingerprint === request.approverFingerprint)!;
+    const block = await sealRequest(request);
+    const intro =
+      `Hi ${approver.name},\n\n${request.requesterName || "I"} would like your approval of plan version ${request.plan.version} for "${request.task.title}".\n\n` +
+      "Open this email in Gmail and click the Mail2Code icon next to the subject to review and sign your decision. The request expires in 7 days.\n\n" +
+      `Plan:\n${request.plan.text}`;
+    const draft = composeOrPaste({
+      account: gmailAccountOf(task?.threadUrl),
+      to: approver.email,
+      subject: requestSubject(request),
+      intro: intro.length > 4_000 ? `${intro.slice(0, 4_000)}…\n(The full plan is in the request below.)` : intro,
+      block,
+      pasteHint: "[Paste the Mail2Code approval request here: press Ctrl+V (⌘V on a Mac).]",
+    });
+    if (draft.paste) await navigator.clipboard.writeText(draft.paste);
+    await browser.tabs.create({ url: draft.url });
+    return draft.paste
+      ? `A Gmail draft to ${approver.name} opened. The request is too long for a link, so it's on your clipboard: paste it into the draft where it says so, then press Send.`
+      : `A Gmail draft to ${approver.name} opened in a new tab. Press Send there; nothing has been sent yet.`;
+  });
+  action("download-request", async () => {
+    const request = await newRequest();
+    downloadText(`approval-request-${request.requestId.slice(0, 8)}.json`, JSON.stringify(request, null, 2));
+    return "Request file downloaded. Send it to the approver; they open it in Mail2Code → Review an approval request.";
+  });
+  $<HTMLSelectElement>("required-approver").addEventListener("change", async (e) => {
+    try {
+      await repo.setRequiredApprover(taskId, (e.target as HTMLSelectElement).value || null);
+      setStatus((e.target as HTMLSelectElement).value ? "From now on, only that person's signed approval counts for this task." : "Anyone's approval counts again, including yours.", "success");
+    } catch (err) {
+      setStatus(errorText(err), "error");
+    }
+    await render();
+  });
+  const responseText = $<HTMLTextAreaElement>("response-text");
+  responseText.addEventListener("input", () => ($<HTMLButtonElement>("import-response").disabled = !responseText.value.trim()));
+  $<HTMLInputElement>("response-file").addEventListener("change", async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0];
+    if (!f) return;
+    if (f.size > 1_000_000) return setStatus("This file is too large to be an approval response.", "error");
+    responseText.value = await f.text();
+    $<HTMLButtonElement>("import-response").disabled = false;
+  });
+  action("import-response", async () => {
+    const response = await readResponse(responseText.value);
+    if (response.payload.taskId !== taskId) throw new Error("This response is for a different task.");
+    const result = await repo.importApprovalResponse(response);
+    responseText.value = "";
+    $<HTMLInputElement>("response-file").value = "";
+    $("inbox-hint").hidden = true;
+    if (inboxId) void send({ kind: "approval.discard", itemId: inboxId });
+    const verb = result.decision === "approve" ? "approved" : result.decision === "reject" ? "rejected" : "asked for changes to";
+    return `Signature verified: ${result.approverName} ${verb} the plan. Recorded.${result.decision === "approve" ? " Claude hasn't been told yet: copy the approval message and send it yourself." : ""}`;
+  });
+  action("send-update", async () => {
+    const { update, approver } = await repo.createProgressUpdate(taskId, $<HTMLInputElement>("update-note").value, nameInput.value);
+    const p = update.payload;
+    const intro =
+      `Hi ${approver.name},\n\nProgress on "${update.taskTitle}" (the plan you approved): ${PROGRESS_LABELS[p.status]}.` +
+      `${p.note ? `\nNote: ${p.note}` : ""}\n\n` +
+      'Open this email in Gmail and click the Mail2Code icon next to the subject to update your "Approved by me" list.';
+    const draft = composeOrPaste({
+      account: gmailAccountOf(task?.threadUrl),
+      to: approver.email,
+      subject: updateSubject(update.taskTitle, p.status),
+      intro,
+      block: await sealUpdate(update),
+      pasteHint: "[Paste the Mail2Code progress update here: press Ctrl+V (⌘V on a Mac).]",
+    });
+    if (draft.paste) await navigator.clipboard.writeText(draft.paste);
+    await browser.tabs.create({ url: draft.url });
+    $<HTMLInputElement>("update-note").value = "";
+    $("update-offer").hidden = true;
+    return `A Gmail draft to ${approver.name} with this update opened in a new tab. Press Send there; nothing has been sent yet.`;
+  });
+
+  if (inboxId) {
+    const reply = await send({ kind: "approval.get", itemId: inboxId });
+    if (reply.ok) {
+      responseText.value = (reply.value as ApprovalBlock).block;
+      $("inbox-hint").hidden = false;
+      $("ask-box").scrollIntoView({ block: "start" });
+    } else {
+      setStatus("The response from Gmail is no longer available. Click the Mail2Code icon on the email again.", "error");
+    }
+  }
 
   await repo.purgeExpired();
   await render();

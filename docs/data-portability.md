@@ -1,12 +1,12 @@
 # Data portability: backups and moving to another computer
 
-Everything Inbox Handoff knows is stored in your browser (IndexedDB). Backups
+Everything Mail2Code knows is stored in your browser (IndexedDB). Backups
 are files you download and keep yourself; nothing is uploaded, and moving to
 a new computer needs neither the old computer nor any server.
 
 ## Making a backup
 
-Open the task list (toolbar button), then **Export or import your tasks**.
+Open the task dashboard (Mail2Code toolbar button → **Task dashboard**), then **Export or import your tasks**.
 
 - **All tasks** or **Selected tasks**.
 - **Include stored email text**: off by default. Only text still stored is
@@ -16,7 +16,7 @@ Open the task list (toolbar button), then **Export or import your tasks**.
   If you include email text without encryption, you must confirm that you
   understand anyone with the file can read it.
 
-The file is named `inbox-handoff-backup-YYYY-MM-DD.json` (or
+The file is named `mail2code-backup-YYYY-MM-DD.json` (or
 `…-encrypted.json`). See [backup-format.md](backup-format.md) for its contents.
 
 ## Moving to another computer

@@ -14,11 +14,11 @@ Not available yet. This page will link to store listings once they exist.
 Requirements: Node.js 24 or later, npm, Git.
 
 ```bash
-git clone <repository-url> inbox-handoff
+git clone <repository-url> mail2code
 ```
 
 ```bash
-cd inbox-handoff
+cd mail2code
 ```
 
 ```bash
@@ -26,7 +26,7 @@ npm ci
 ```
 
 ```bash
-npm run -w @inbox-handoff/extension build:all
+npm run -w @mail2code/extension build:all
 ```
 
 This creates `apps/extension/dist/chrome-mv3`, `edge-mv3` and `firefox-mv3`.
@@ -55,8 +55,8 @@ This creates `apps/extension/dist/chrome-mv3`, `edge-mv3` and `firefox-mv3`.
 
 ### 3. Check it works
 
-1. Open Gmail and open a conversation. A **Send to Claude** button appears next to the subject.
-2. Click the toolbar icon to open the task list.
+1. Open Gmail and open a conversation. A round **Send to Claude** button (an envelope with `</>`) appears next to the subject; hover it to see its name.
+2. Pin Mail2Code to the toolbar (puzzle-piece icon → pin). Clicking it shows **Task dashboard** and **Settings**; the same two links are at the bottom of the Send to Claude card in Gmail.
 
 ## Updating
 

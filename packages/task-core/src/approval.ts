@@ -1,4 +1,4 @@
-import type { PlanDecision, TaskStatus } from "@inbox-handoff/protocol";
+import type { PlanDecision, TaskStatus } from "@mail2code/protocol";
 import { planHash } from "./plan-hash.ts";
 
 export interface PlanRecord {
@@ -19,8 +19,13 @@ export interface ApprovalRecord {
   planHash: string;
   decision: PlanDecision["decision"];
   comment: string | null;
-  // Imported approvals are history only and never count as current.
-  origin: "local" | "imported";
+  // local: decided in this browser. signed: another person's verified,
+  // signed response. imported: from a backup; history only, never current.
+  origin: "local" | "imported" | "signed";
+  // Who signed, for origin "signed" (and for imported copies of signed ones).
+  signedBy?: { fingerprint: string; name: string } | null;
+  // For origin "signed": the request it answered (progress updates refer to it).
+  requestId?: string;
   decidedAt: number;
   supersededAt: number | null;
 }
@@ -44,16 +49,31 @@ export function verifyDecision(input: { decision: PlanDecision; taskStatus: Task
   return { ok: true };
 }
 
-export type CurrentApprovalRejection = "no_plan" | "no_approval" | "approval_imported" | "approval_superseded" | "approval_for_other_plan";
+export type CurrentApprovalRejection =
+  | "no_plan"
+  | "no_approval"
+  | "approval_imported"
+  | "approval_superseded"
+  | "approval_for_other_plan"
+  | "approval_not_from_required_approver";
 
-// Whether the latest plan carries a current, local approval. Required before
-// the user can report that implementation started.
-export function hasCurrentApproval(input: { latestPlan: PlanRecord | null; approval: ApprovalRecord | null }): Verdict<CurrentApprovalRejection> {
-  const { latestPlan, approval } = input;
+// Whether the latest plan carries a current approval made in this browser
+// (by the user, or another person's verified signed response). Required
+// before the user can report that implementation started. When the task
+// requires a named approver, only that person's signed approval counts.
+export function hasCurrentApproval(input: {
+  latestPlan: PlanRecord | null;
+  approval: ApprovalRecord | null;
+  requiredApprover?: string | null;
+}): Verdict<CurrentApprovalRejection> {
+  const { latestPlan, approval, requiredApprover } = input;
   if (!latestPlan) return { ok: false, reason: "no_plan" };
   if (!approval || approval.decision !== "approve") return { ok: false, reason: "no_approval" };
-  if (approval.origin !== "local") return { ok: false, reason: "approval_imported" };
+  if (approval.origin === "imported") return { ok: false, reason: "approval_imported" };
   if (approval.supersededAt !== null) return { ok: false, reason: "approval_superseded" };
   if (approval.planId !== latestPlan.id || approval.planHash !== latestPlan.hash) return { ok: false, reason: "approval_for_other_plan" };
+  if (requiredApprover && (approval.origin !== "signed" || approval.signedBy?.fingerprint !== requiredApprover)) {
+    return { ok: false, reason: "approval_not_from_required_approver" };
+  }
   return { ok: true };
 }

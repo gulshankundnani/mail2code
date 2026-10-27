@@ -3,12 +3,12 @@
 Status is evidence-based. "Tested" means an automated or manual run actually
 happened on the stated version; everything else is "planned" or "built".
 
-## Extension (Phases 2–5)
+## Extension (Phases 2–5 plus Open in Claude)
 
 | Browser | Status | Evidence |
 |---|---|---|
-| Chromium (Playwright build 156.0.8078.x), Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 24/24 passing, 2026-10-24 |
-| Microsoft Edge 155.0.4283.62, Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 24/24 passing (installed Edge, headless), 2026-10-24 |
+| Chromium (Playwright build 156.0.8078.x), Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 33/33 passing, 2026-10-24 |
+| Microsoft Edge 155.0.4283.62, Windows 11 | **Tested** against synthetic fixtures | `npm run test:e2e`, 33/33 passing (installed Edge, headless), 2026-10-24 |
 | Google Chrome 156 (branded) | Built, not automated | Branded Chrome no longer honours `--load-extension`; automation uses Playwright's Chromium. Manual unpacked load not yet done |
 | Brave | Built (same Chromium MV3 build as Chrome), not tested | Brave runs Chromium extensions unchanged; no Brave-specific APIs are used. Not installed on the dev machine |
 | Firefox 140+ (desktop), 142+ (Android) | Built and linted, not tested | `wxt build -b firefox --mv3`; `web-ext lint` 10.8.0: 0 errors, 2 warnings (zod's `Function` code path, disabled at runtime and blocked by CSP). Not installed on the dev machine; Playwright can't load Firefox extensions |
@@ -44,19 +44,19 @@ Gmail's real DOM is undocumented and may differ. **Compatibility with live
 Gmail has not been verified.** Manual check:
 
 1. Load `apps/extension/dist/chrome-mv3` (or `edge-mv3`) unpacked.
-2. Open a real conversation; confirm one **Send to Claude** button next to the subject.
+2. Open a real conversation; confirm one **Send to Claude** button (envelope icon) next to the subject.
 3. Click it; check subject, sender, date and text for one message and for the whole conversation.
 4. Navigate between conversations and the inbox; confirm the button follows correctly.
 
-## Bundle size (production Chrome build, after Phase 4, 2026-10-24)
+## Bundle size (production Chrome build, with signed approvals, 2026-10-26)
 
 | File | Raw | gzip | Loaded when |
 |---|---|---|---|
-| `content-scripts/gmail.js` | 11.1 kB | 4.4 kB | On every Gmail page |
-| `background.js` | 107.6 kB | 30.4 kB | Service worker, on demand |
-| shared page chunk (`ui-*.js`) | 111.2 kB | 31.3 kB | Extension pages only |
-| backup / task / review / options pages | 19.2 / 12.0 / 5.8 / 4.6 kB | 6.6 / 4.7 / 2.4 / 2.2 kB | Extension pages only |
-| **Whole extension** | **294.8 kB** | — | — |
+| `content-scripts/gmail.js` | 50.9 kB | 18.1 kB | On every Gmail page (button, analysis, preview and approval cards, styles; no zod, no SDK) |
+| `background.js` | 494.3 kB | 119.1 kB | Service worker, on demand (includes the official Anthropic SDK: MV3 service workers can't load code lazily) |
+| shared page chunk (`ui-*.js`) | 124.1 kB | 34.6 kB | Extension pages only |
+| backup / options / task / review / approve pages | 20.6 / 18.8 / 17.5 / 8.0 / 4.2 kB | 7.1 / 7.1 / 6.6 / 3.3 / 2.0 kB | Extension pages only |
+| **Whole extension** (including icons) | **793.3 kB** | — | — |
 
 Most of the background and page code is the zod validation library. The Gmail
 content script deliberately does not include it (the background re-validates
@@ -65,7 +65,7 @@ every capture). Switching to `zod/mini` is a possible later reduction.
 ## Loading the unpacked extension (development)
 
 ```bash
-npm run -w @inbox-handoff/extension build:all
+npm run -w @mail2code/extension build:all
 ```
 
 - Chrome: `chrome://extensions` → Developer mode → Load unpacked → `apps/extension/dist/chrome-mv3`

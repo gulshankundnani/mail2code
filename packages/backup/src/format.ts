@@ -1,12 +1,13 @@
-// The export format, version 1. Documented in docs/backup-format.md and kept
+// The export format, version 2 (version 1 files are upgraded on import). Documented in docs/backup-format.md and kept
 // independent of the extension's IndexedDB layout: the extension maps its
 // records to and from these shapes.
 import { z } from "zod";
-import { BLOCK_REASONS, LIMITS, PrioritySchema, RetentionDaysSchema, TASK_STATUSES } from "@inbox-handoff/protocol";
+import { BLOCK_REASONS, EmailAddressSchema, FingerprintSchema, LIMITS, MAX_APPROVER_NAME_CHARS, PrioritySchema, RetentionDaysSchema, TASK_STATUSES } from "@mail2code/protocol";
 
-export const EXPORT_FORMAT = "inbox-handoff-export";
-export const ENCRYPTED_FORMAT = "inbox-handoff-encrypted-export";
-export const CURRENT_SCHEMA_VERSION = 1;
+export const EXPORT_FORMAT = "mail2code-export";
+export const ENCRYPTED_FORMAT = "mail2code-encrypted-export";
+export const CURRENT_SCHEMA_VERSION = 2;
+export const MAX_APPROVERS = 500;
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 export const MAX_TASKS = 10_000;
 
@@ -46,6 +47,8 @@ export const ExportTaskSchema = z.strictObject({
   lastRefreshAt: isoOrNull,
   contextChangedAt: isoOrNull,
   handoff: z.strictObject({ preparedAt: isoOrNull, openedAt: isoOrNull, destination: z.string().max(200).nullable() }),
+  // v2: the one approver whose signed approval this task needs, or null.
+  requiredApprover: FingerprintSchema.nullable(),
   // Present only when the user chose to export stored email text.
   emailContent: z
     .array(z.strictObject({ messageId: gmailId, bodyText: z.string().max(LIMITS.maxMessageBodyChars) }))
@@ -75,6 +78,18 @@ export const ExportApprovalSchema = z.strictObject({
   comment: z.string().max(LIMITS.maxNoteChars).nullable(),
   decidedAt: iso,
   supersededAt: isoOrNull,
+  // v2: who signed it, when it came from another person's signed response.
+  signedBy: z.strictObject({ fingerprint: FingerprintSchema, name: z.string().min(1).max(MAX_APPROVER_NAME_CHARS) }).nullable(),
+});
+
+// v2: people whose signed approvals the exporting browser accepted (public
+// keys only). On import they arrive unconfirmed and must be confirmed again.
+export const ExportApproverSchema = z.strictObject({
+  fingerprint: FingerprintSchema,
+  name: z.string().min(1).max(MAX_APPROVER_NAME_CHARS),
+  email: EmailAddressSchema,
+  publicKey: z.string().regex(/^[A-Za-z0-9+/]{120,200}={0,2}$/),
+  addedAt: iso,
 });
 
 export const ExportEventSchema = z.strictObject({
@@ -90,6 +105,7 @@ export const ExportDataSchema = z.strictObject({
   approvals: z.array(ExportApprovalSchema),
   events: z.array(ExportEventSchema),
   settings: z.strictObject({ retentionDays: RetentionDaysSchema }),
+  approvers: z.array(ExportApproverSchema).max(MAX_APPROVERS),
 });
 
 export const ExportFileSchema = z.strictObject({
@@ -121,6 +137,7 @@ export type ExportTask = z.infer<typeof ExportTaskSchema>;
 export type ExportPlan = z.infer<typeof ExportPlanSchema>;
 export type ExportApproval = z.infer<typeof ExportApprovalSchema>;
 export type ExportEvent = z.infer<typeof ExportEventSchema>;
+export type ExportApprover = z.infer<typeof ExportApproverSchema>;
 export type ExportData = z.infer<typeof ExportDataSchema>;
 export type ExportFile = z.infer<typeof ExportFileSchema>;
 export type EncryptedFile = z.infer<typeof EncryptedFileSchema>;

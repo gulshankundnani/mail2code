@@ -1,0 +1,206 @@
+{
+  "format": "mail2code-export",
+  "schemaVersion": 2,
+  "appVersion": "0.0.0",
+  "exportedAt": "2026-10-24T12:00:00.000Z",
+  "includesEmailContent": true,
+  "data": {
+    "tasks": [
+      {
+        "id": "a1a1a1a1-0000-4000-8000-000000000001",
+        "title": "Fix login (awaiting approval)",
+        "status": "AwaitingApproval",
+        "blockReason": null,
+        "priority": "normal",
+        "dueAt": null,
+        "repositoryRef": "https://github.com/example/app",
+        "instructions": "",
+        "scope": "message",
+        "threadId": "thread-f:1",
+        "threadUrl": "https://mail.google.com/mail/u/0/#inbox/thread-f:1",
+        "sources": [
+          {
+            "messageId": "msg-f:11",
+            "subject": "Synthetic subject",
+            "from": "Ada <ada@example.test>",
+            "date": "Oct 1, 2026",
+            "addedAt": "2026-10-01T12:00:00.000Z"
+          }
+        ],
+        "idempotencyKey": "a1a1a1a1000040008000000000000001ffffffffffffffffffffffffffffffff",
+        "createdAt": "2026-10-01T12:00:00.000Z",
+        "updatedAt": "2026-10-02T12:00:00.000Z",
+        "lastRefreshAt": null,
+        "contextChangedAt": null,
+        "handoff": {
+          "preparedAt": "2026-10-02T09:00:00.000Z",
+          "openedAt": "2026-10-02T10:00:00.000Z",
+          "destination": "https://claude.ai/code"
+        },
+        "requiredApprover": null
+      },
+      {
+        "id": "a1a1a1a1-0000-4000-8000-000000000002",
+        "title": "Release 2.0 (in progress)",
+        "status": "InProgress",
+        "blockReason": null,
+        "priority": "high",
+        "dueAt": "2026-10-31T23:00:00.000Z",
+        "repositoryRef": "https://github.com/example/app",
+        "instructions": "",
+        "scope": "message",
+        "threadId": "thread-f:2",
+        "threadUrl": "https://mail.google.com/mail/u/0/#inbox/thread-f:2",
+        "sources": [
+          {
+            "messageId": "msg-f:21",
+            "subject": "Synthetic subject",
+            "from": "Ada <ada@example.test>",
+            "date": "Oct 1, 2026",
+            "addedAt": "2026-10-01T12:00:00.000Z"
+          }
+        ],
+        "idempotencyKey": "a1a1a1a1000040008000000000000002ffffffffffffffffffffffffffffffff",
+        "createdAt": "2026-10-01T12:00:00.000Z",
+        "updatedAt": "2026-10-02T12:00:00.000Z",
+        "lastRefreshAt": null,
+        "contextChangedAt": null,
+        "handoff": {
+          "preparedAt": null,
+          "openedAt": null,
+          "destination": null
+        },
+        "requiredApprover": "56f795a79e0d77e0eaa91a2d3337491bee9dee6ec6e4a173baf1c17b1d6f0bd6"
+      },
+      {
+        "id": "a1a1a1a1-0000-4000-8000-000000000003",
+        "title": "Update README (completed, with email text)",
+        "status": "Completed",
+        "blockReason": null,
+        "priority": "normal",
+        "dueAt": null,
+        "repositoryRef": "https://github.com/example/app",
+        "instructions": "",
+        "scope": "thread",
+        "threadId": "thread-f:3",
+        "threadUrl": "https://mail.google.com/mail/u/0/#inbox/thread-f:3",
+        "sources": [
+          {
+            "messageId": "msg-f:31",
+            "subject": "Synthetic subject",
+            "from": "Ada <ada@example.test>",
+            "date": "Oct 1, 2026",
+            "addedAt": "2026-10-01T12:00:00.000Z"
+          }
+        ],
+        "idempotencyKey": "a1a1a1a1000040008000000000000003ffffffffffffffffffffffffffffffff",
+        "createdAt": "2026-10-01T12:00:00.000Z",
+        "updatedAt": "2026-10-02T12:00:00.000Z",
+        "lastRefreshAt": null,
+        "contextChangedAt": null,
+        "handoff": {
+          "preparedAt": null,
+          "openedAt": null,
+          "destination": null
+        },
+        "requiredApprover": null,
+        "emailContent": [
+          {
+            "messageId": "msg-f:31",
+            "bodyText": "Please update the README. Contact: ops@example.test"
+          }
+        ]
+      }
+    ],
+    "plans": [
+      {
+        "id": "b2b2b2b2-0000-4000-8000-000000000001",
+        "taskId": "a1a1a1a1-0000-4000-8000-000000000001",
+        "version": 1,
+        "hash": "c69eb8d2b2342b8d15f0e1c54d8337ef84bbb2459beddad50c26e5b866507383",
+        "text": "Objective: reject empty passwords.\nSteps: edit src/auth.ts; add a test.",
+        "source": "pasted",
+        "recordedAt": "2026-10-03T12:00:00.000Z"
+      },
+      {
+        "id": "b2b2b2b2-0000-4000-8000-000000000002",
+        "taskId": "a1a1a1a1-0000-4000-8000-000000000002",
+        "version": 1,
+        "hash": "30a9f137aa09089bbf32cee5c4331ca5732b9cf4352ad1e59afc8813642a9537",
+        "text": "Objective: bump the version.\nSteps: edit package.json; run npm test.",
+        "source": "pasted",
+        "recordedAt": "2026-10-03T12:00:00.000Z"
+      }
+    ],
+    "approvals": [
+      {
+        "id": "c3c3c3c3-0000-4000-8000-000000000001",
+        "taskId": "a1a1a1a1-0000-4000-8000-000000000002",
+        "planId": "b2b2b2b2-0000-4000-8000-000000000002",
+        "planVersion": 1,
+        "planHash": "30a9f137aa09089bbf32cee5c4331ca5732b9cf4352ad1e59afc8813642a9537",
+        "decision": "approve",
+        "comment": "Looks good",
+        "decidedAt": "2026-10-04T12:00:00.000Z",
+        "supersededAt": null,
+        "signedBy": {
+          "fingerprint": "56f795a79e0d77e0eaa91a2d3337491bee9dee6ec6e4a173baf1c17b1d6f0bd6",
+          "name": "Priya Example"
+        }
+      }
+    ],
+    "events": [
+      {
+        "taskId": "a1a1a1a1-0000-4000-8000-000000000001",
+        "at": "2026-10-01T12:00:00.000Z",
+        "type": "task.captured",
+        "data": {
+          "scope": "message",
+          "messageCount": 1
+        }
+      },
+      {
+        "taskId": "a1a1a1a1-0000-4000-8000-000000000002",
+        "at": "2026-10-01T12:00:00.000Z",
+        "type": "task.captured",
+        "data": {
+          "scope": "message",
+          "messageCount": 1
+        }
+      },
+      {
+        "taskId": "a1a1a1a1-0000-4000-8000-000000000002",
+        "at": "2026-10-05T12:00:00.000Z",
+        "type": "note",
+        "data": {
+          "text": "Started on a branch"
+        }
+      },
+      {
+        "taskId": "a1a1a1a1-0000-4000-8000-000000000003",
+        "at": "2026-10-01T12:00:00.000Z",
+        "type": "task.captured",
+        "data": {
+          "scope": "thread",
+          "messageCount": 1
+        }
+      }
+    ],
+    "settings": {
+      "retentionDays": 90
+    },
+    "approvers": [
+      {
+        "fingerprint": "56f795a79e0d77e0eaa91a2d3337491bee9dee6ec6e4a173baf1c17b1d6f0bd6",
+        "name": "Priya Example",
+        "email": "priya@example.test",
+        "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvG4/2oH33JBHzItttadDt+yKa8+gsyyOTTwA1kU8Kocu+hq/T4FD0CWx+KjmqBwkz5StyCTDH+ce/O0JEufP/Q==",
+        "addedAt": "2026-10-02T12:00:00.000Z"
+      }
+    ]
+  },
+  "checksum": {
+    "algorithm": "SHA-256",
+    "value": "8c1a5ac5046a3f8830980ca11dd29a631a2a5347af22c7c4cbc1d48b79904dec"
+  }
+}

@@ -1,6 +1,6 @@
 # Threat model
 
-Last reviewed 2026-10-24 (Phase 5). Scope: the Inbox Handoff browser extension
+Last reviewed 2026-10-24 (Phase 5). Scope: the Mail2Code browser extension
 as built from this repository. There is no server, native host or companion
 application.
 
@@ -53,6 +53,31 @@ application.
 | T10 | **Silent background activity** | No timers or polling; no network permissions; extension pages have `connect-src 'none'`. Purges run on browser start, install and page open only. | — |
 | T11 | **Supply chain** | One third-party runtime dependency (zod); exact versions pinned; `npm audit --omit=dev` clean; zod's code generation disabled (`jitless`) and blocked by CSP. | Dev tooling (WXT, Vite, Playwright) runs on developer machines at build time. |
 | T12 | **Gmail DOM changes or ambiguity** capturing the wrong message | Multiple selector strategies; refuses when a conversation or message can't be identified, or when two conversations are visible; the review page shows exactly what was captured. | Live Gmail is not verified yet. |
+
+## Added with "Open in Claude" (deep links, analysis, settings)
+
+| # | Threat | Mitigation | Residual risk |
+|---|---|---|---|
+| T13 | **Prompt injection reaching Claude Code** through the pre-filled prompt | Only an analysis of the email is sent, fenced as untrusted with a random tag; the prompt asks for a plan first. Claude's apps never auto-send link prompts and Claude Code labels them "Prompt from an external link". Settings recommend `permissions.defaultMode: "plan"`, which Claude Code enforces. | A user who sends the prompt without reading it, in a mode other than plan, relies on Claude resisting the injected text. |
+| T14 | **Link parameter injection** (email text adding `&cwd=`, `&ssh_host=`, …) | Every parameter goes through `encodeURIComponent`; `buildClaudeLink` validates SSH host/port/folder (documented character rules, no leading `-`), local folders (absolute, no UNC, no `..`, no control characters), repository slugs; invisible/bidi characters are stripped from prompts; prompts over 5,000 characters are refused. | — |
+| T15 | **API key theft** | Stored in the extension's IndexedDB (unreachable from content scripts and web pages), validated on save, used only in the background script, never logged, exported or sent to the Gmail page. Network access is limited by CSP to `api.anthropic.com` and needs an optional permission the user grants; **Remove key** deletes it and withdraws the permission. | Anyone with control of the browser profile or OS account can read local data. |
+| T16 | **Gmail page triggering actions through the card** | The card ignores synthetic clicks; the content script can only ask the background to *capture*, *summarise* (if enabled) and *record a task*, each validated with strict schemas. It can't approve plans, change settings, read the key, export or import. Key events in the card don't reach Gmail. | A real click by the user on a hostile email still opens Claude with an analysis of that email (see T13). |
+| T17 | **Email text sent to a third party without consent** | Claude API summaries are off by default, disclosed in Settings, need a key and an explicit permission grant; credentials are redacted first; on-device AI never downloads a model on its own. | When enabled, Anthropic processes the cleaned email text under the user's API terms. |
+| T18 | **Malicious settings** (tampered `storage.local`) | Preferences are re-validated on every read; unknown values fall back to safe defaults (`bypassPermissions` is never offered or accepted). | — |
+
+## Added with approval by another person
+
+| # | Threat | Mitigation | Residual risk |
+|---|---|---|---|
+| T19 | **Forged approval email** ("Approved" text, or a block signed by someone else) | Only signed data counts. A response must carry a valid ECDSA P-256 signature from a key in this browser's trusted list, looked up by fingerprint; keys and names inside the email are ignored. Email wording is never read as a decision. | — |
+| T20 | **Key substitution** (an attacker sends a card in the approver's name) | Adding a card requires the user to tick that they checked the fingerprint with that person directly; the card's fingerprint must match its key; your own card can't be added. | A user who ticks the box without checking can be fooled. |
+| T21 | **Replay or reuse** of a genuine response (for another task, plan version, or a second time) | The signed payload names the request, task, plan version and plan fingerprint, under a dedicated domain tag. Requests are addressed to one approver, single-use, expire after 7 days, and the plan must still be the current version. | — |
+| T22 | **Self-approval** | A response signed by this browser's own identity is refused, and your own card can't be a trusted approver. A task can require a named approver, which disables your own Approve button. | A second browser profile with its own identity can still approve; trust rests on whose fingerprint you confirmed. |
+| T23 | **Gmail page driving approvals** | The approval card only hands the sealed block to the background on a real click. Reviewing, signing and recording happen on extension pages. The content script can't read handed-over items back, sign or record anything. The signing key is a non-extractable CryptoKey in the extension's IndexedDB. | — |
+| T24 | **Hostile approval data** (oversized blocks, compression bombs, malformed JSON) | Block and file size limits; decompression stops at 512 KB; strict schemas with unknown fields rejected; the plan text in a request must match its fingerprint before the approver sees it; all text shown with textContent. | — |
+| T25 | **Backup adding a trusted approver** | Approvers restored from a backup arrive unconfirmed and are not trusted until the user confirms the fingerprint again; fingerprints must match their keys. | — |
+| T26 | **Plan text exposure** | Requests carry only the task title and plan, never email text. | The plan is stored in both Gmail accounts, like any email. |
+| T27 | **Forged or replayed progress updates** misleading an approver | Updates are signed with the requester key named in the original request (stored by the approver when signing) under their own domain tag; updates for plans not signed in that browser, with bad signatures, or with a sequence number not newer than the last are ignored. | The status is the requester's report; Mail2Code can't verify the work itself. |
 
 ## Out of scope
 

@@ -1,5 +1,5 @@
-import type { CapturedConversation, Priority } from "@inbox-handoff/protocol";
-import { STATUS_LABELS } from "@inbox-handoff/task-core";
+import type { CapturedConversation, Priority } from "@mail2code/protocol";
+import { STATUS_LABELS } from "@mail2code/task-core";
 import { browser } from "wxt/browser";
 import type { TaskRecord } from "../../src/db/schema.ts";
 import { TaskRepo } from "../../src/db/task-repo.ts";

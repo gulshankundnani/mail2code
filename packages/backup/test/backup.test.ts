@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planHash } from "@inbox-handoff/task-core";
+import { planHash } from "@mail2code/task-core";
 import {
   BackupError,
   CURRENT_SCHEMA_VERSION,
@@ -45,6 +45,7 @@ function task(id: string, over: Partial<ExportTask> = {}): ExportTask {
     lastRefreshAt: null,
     contextChangedAt: null,
     handoff: { preparedAt: null, openedAt: null, destination: null },
+    requiredApprover: null,
     ...over,
   };
 }
@@ -56,6 +57,7 @@ async function data(): Promise<ExportData> {
     approvals: [],
     events: [{ taskId: T1, at: NOW, type: "task.captured", data: { scope: "message", messageCount: 1 } }],
     settings: { retentionDays: 30 },
+    approvers: [],
   };
 }
 
@@ -80,7 +82,7 @@ describe("plain JSON export", () => {
 
   it("rejects non-JSON, non-backups and newer versions", async () => {
     expect(() => parseBackupText("not json")).toThrow(BackupError);
-    expect(() => parseBackupText(JSON.stringify({ hello: 1 }))).toThrow(/isn't an Inbox Handoff backup/);
+    expect(() => parseBackupText(JSON.stringify({ hello: 1 }))).toThrow(/isn't a Mail2Code backup/);
     expect(() => parseBackupText("[]")).toThrow(BackupError);
     await expect(roundTrip({ ...(await file()), schemaVersion: 99 })).rejects.toMatchObject({ code: "newer_version" });
   });
@@ -110,7 +112,7 @@ describe("plain JSON export", () => {
       code: "broken_references",
     });
     await expect(roundTrip(await file({ ...d, tasks: [task(T1), task(T1)] }))).rejects.toMatchObject({ code: "broken_references" });
-    const approval = { id: A1, taskId: T2, planId: P1, planVersion: 1, planHash: d.plans[0]!.hash, decision: "approve" as const, comment: null, decidedAt: NOW, supersededAt: null };
+    const approval = { id: A1, taskId: T2, planId: P1, planVersion: 1, planHash: d.plans[0]!.hash, decision: "approve" as const, comment: null, decidedAt: NOW, supersededAt: null, signedBy: null };
     await expect(roundTrip(await file({ ...d, approvals: [approval] }))).rejects.toMatchObject({ code: "broken_references" });
   });
 
@@ -155,13 +157,13 @@ describe("encryption", () => {
   });
 
   it("refuses crafted files with extreme key-derivation settings", () => {
-    const enc = { format: "inbox-handoff-encrypted-export", version: 1, kdf: { name: "PBKDF2", hash: "SHA-256", iterations: 1e9, salt: "AAAAAAAAAAAAAAAAAAAAAA==" }, cipher: { name: "AES-GCM", iv: "AAAAAAAAAAAAAAAA" }, ciphertext: "AAAA" };
+    const enc = { format: "mail2code-encrypted-export", version: 1, kdf: { name: "PBKDF2", hash: "SHA-256", iterations: 1e9, salt: "AAAAAAAAAAAAAAAAAAAAAA==" }, cipher: { name: "AES-GCM", iv: "AAAAAAAAAAAAAAAA" }, ciphertext: "AAAA" };
     expect(() => parseBackupText(JSON.stringify(enc))).toThrow(/unsupported settings/);
   });
 });
 
 describe("import planning", () => {
-  const empty: ExportData = { tasks: [], plans: [], approvals: [], events: [], settings: { retentionDays: 30 } };
+  const empty: ExportData = { tasks: [], plans: [], approvals: [], events: [], settings: { retentionDays: 30 }, approvers: [] };
 
   it("classifies new, identical, conflicting and duplicate tasks", async () => {
     const f = await file();

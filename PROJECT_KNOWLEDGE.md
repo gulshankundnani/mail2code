@@ -4,6 +4,49 @@
 > contributor (human or agent) follows. Distilled from the original project
 > brief (2026-10-24). If the brief and this file disagree, ask the project owner.
 
+## ⚠ Revision (2026-10-24, after Phase 7): open local Claude Code directly, analyse before sending
+
+Owner feedback: clicking **Send to Claude** must open Claude Code **on this PC** with a new chat, with no copy-paste; the emails must be **analysed**, not sent as whole texts.
+
+Findings:
+- **`claude://code/new?q=<prompt>`** (Claude desktop app) opens a new local Code session with the prompt pre-filled. **Verified on the owner's PC**; the handler is registered by the Claude app.
+- **`claude-cli://open?q=…&repo=owner/name|cwd=…`** (Claude Code CLI) opens a terminal session. It's documented in `code.claude.com/docs/en/deep-links`, limits `q` to 5,000 characters, and registers itself after the first interactive prompt. **Not registered on this PC yet.**
+- **Neither link auto-sends** the prompt, by Anthropic's design: the user presses Enter.
+- **Browsers ask before opening an external app** the first time ("Always allow" is available).
+
+**Built (2026-10-27), not committed: task updates for approvers** (owner approved D7 updates signed with an automatic requester key; D8 offer after each status change plus a manual button; storage v3; "Approved by me" list not in backups yet). The shared database / GitHub sync idea was considered and dropped by the owner.
+
+**Built (2026-10-26), not committed: signed approvals from another person, delivered through Gmail** (docs/approvals.md; threat model T19–T26; storage v2; backup format v2 with v1 migration; v2 golden files). Untested: real Gmail draft window and link-length limits, reply threading, two real people. Owner approved: D5 an approval email is recognised only when the user clicks the Mail2Code icon (no background scanning); D6 a request too long for a Gmail draft link is copied to the clipboard to paste, with file download as fallback; the approver card carries an email address for the To: line; review, signing and recording happen only on extension pages, never in the Gmail DOM. Earlier plan: D1 one named approver, D2 optional per-task "needs approval from X", D3 7-day request expiry, D4 request file holds only task title and plan. Changes from the plan: approval files may be up to 512 KB (plans can be 200,000 characters), and approvers restored from a backup arrive unconfirmed. All steps done.
+
+Owner decisions:
+- **Destination:** chosen per task, with a default in settings.
+- **Analysis:** local rules, plus Chrome's on-device Summarizer when it's already available (never auto-download).
+- **No bundled AI model (2026-10-24):** summaries come only from the built-in rules, the browser's own on-device AI (Chrome/Edge Summarizer), or the optional Claude API. Shipping or downloading a separate model (and the `'wasm-unsafe-eval'` CSP and model-host permission it would need) was considered and declined by the owner.
+- **Flow:** a quick preview card in Gmail, then one click on "Open in Claude".
+
+Later owner requests:
+- A Settings section for API details, default permissions and modes, and environment.
+- Making sure attackers can't misuse or penetrate the extension.
+
+**Built (not yet committed):**
+- **Analysis:** `packages/analysis` cleans each email and extracts requests, decisions, deadlines, questions, links and attachments; `composePrompt` keeps the prompt under 4,500 characters and fences the email extract as untrusted.
+- **Deep links:** `src/deeplink.ts` builds `claude://code/new`, the SSH variant and `claude-cli://open`. Every parameter is validated and encoded.
+- **Preview card** (`src/card/card.ts`): runs in Gmail with no zod or SDK. Keystrokes stay inside the card, only trusted clicks act, it records the task on Open, and "More options" leads to the full review page.
+- **Settings** (options page):
+  - destination, terminal folder, and SSH host/port/folder;
+  - default mode, with a generated `permissions.defaultMode` snippet (plan recommended);
+  - analysis engine: rules, on-device AI (only if the model is already downloaded), or Claude API.
+- **Claude API option:** uses the official `@anthropic-ai/sdk` 1.3.0 in the background only, with `claude-opus-5-5` by default, `low` effort and `fallbacks: "default"` for Opus/Sonnet.
+  - The key is stored in the extension's IndexedDB; it's never exported or sent to the Gmail page.
+  - Access requires `optional_host_permissions: api.anthropic.com`, and CSP `connect-src` allows only that host.
+- **Threat model:** T13–T18 added.
+
+**Evidence:** 158 unit tests and 66 E2E tests (33 each in Chromium and Edge) pass; the secret scan, licenses (9 runtime packages, all permissive), both audits at 0 and `web-ext lint` with 0 errors are clean.
+
+**Costs:** the background bundle is 478 kB (115 kB gzipped) because the SDK can't be lazy-loaded in an MV3 service worker. The Gmail script is 34 kB.
+
+**Not tested:** `claude-cli://` and SSH links, live Claude API summaries (no key available), on-device AI (no model in Playwright's Chromium), and live Gmail.
+
 ## ⚠ Current direction (2026-10-24): extension-only — supersedes the bridge plan
 
 The owner replaced the original brief with an **extension-only** brief: users
@@ -14,7 +57,7 @@ SQLite (§3, §6, §7, the bridge parts of §8, and P2–P14) is **superseded**.
 The working rules in §0 still apply.
 
 Approved decisions (recommended defaults, 2026-10-24):
-- **D1** Name: working name "Inbox Handoff", button "Send to Claude" (Anthropic branding rules don't allow "Claude Code" in a third-party product name).
+- **D1** Name: working name "Mail2Code", button "Send to Claude" (Anthropic branding rules don't allow "Claude Code" in a third-party product name).
 - **D2** Optional Managed Agents adapter only if a browser test confirms it works → probe result: **no-go as designed** (see `docs/claude-integrations.md`).
 - **D3** Browser handoff records approval but cannot enforce it; the UI says so.
 - **D4** Handoff opens `claude.ai/code` for GitHub repositories, otherwise `claude.ai/new`; no task content in the URL.
@@ -33,7 +76,7 @@ Status:
 - **Not built in Phase 3:** automatic summaries of requirements, decisions, deadlines or open questions. They need a language model, and the extension has none. Users can keep their own notes instead. There's no automatic reply monitoring either, because no Gmail access is granted.
 - **Phase 4 done (not yet committed):**
   - **Code:** `packages/backup` holds the format, checksum, encryption, validation and import planning. `apps/extension/src/backup/mapping.ts` converts between database records and the export format. The new `backup.html` page is linked from the task list.
-  - **Format:** versioned JSON (`inbox-handoff-export` v1). It is validated strictly (unknown fields are rejected), carries a SHA-256 checksum, and is documented in `docs/backup-format.md`.
+  - **Format:** versioned JSON (`mail2code-export` v1). It is validated strictly (unknown fields are rejected), carries a SHA-256 checksum, and is documented in `docs/backup-format.md`.
   - **Export:** all or selected tasks. Email text is off by default; including it requires either encryption or an explicit acknowledgement.
   - **Encryption:** optional, using Web Crypto (PBKDF2-SHA256 at 600,000 iterations, then AES-256-GCM with the parameters as additional authenticated data). The passphrase must be at least 12 characters and is never stored.
   - **Import:** checks size, JSON, format, version, schema, checksum, references between records, then plan fingerprints. It shows a preview and offers three strategies: restore (only into an empty installation), merge (choose which version wins on conflicts; duplicate handoffs are skipped), or replace (type REPLACE). Everything is applied in one IndexedDB transaction.
@@ -63,12 +106,19 @@ Status:
     - `.github/dependabot.yml` opens update PRs weekly; nothing merges automatically.
   - **Scripts:** `check:manifests`, `scan:secrets` (reuses `secrets.ts`), `licenses` / `licenses:check`. The runtime closure is zod (MIT) only.
   - **Detector precision:** assignment-style matches now require a value of at least 8 characters with at least 2 character classes, so text like "password: reset" or `passphrase: string` no longer matches.
-  - **Zips:** `zip:all` produces `inbox-handoff-<version>-{chrome,edge,firefox,sources}.zip`.
+  - **Zips:** `zip:all` produces `mail2code-<version>-{chrome,edge,firefox,sources}.zip`.
 - **No formatter or linter adopted:** TypeScript strict mode plus `.editorconfig` only. Adding one (e.g. Biome) is an open decision.
 - **CI never run yet:** no GitHub repository exists, and nothing is pushed.
 - **Evidence:** 115 unit tests and 48 E2E tests pass; the secret scan, license check, production audit and docs link check are clean; the workflow YAML parses.
 - **Not verified:** live Gmail; Firefox and Brave in a real browser (not installed here); branded Chrome; macOS; Linux.
-- **Next:** Phase 7 (release readiness report). Nothing gets published without explicit approval.
+- **Phase 7 done (not yet committed):** the report is in `docs/release-readiness.md`.
+  - **Fresh-clone verification of `4ab0d20`:** a clean `npm ci`, typecheck, 115/115 unit tests, all builds, manifest check, 48/48 E2E, secret scan, license check, audits at 0, and `web-ext lint` with 0 errors.
+  - **Permission audit:** every API maps to `storage` or needs no permission, and there are no network calls in the source.
+  - **Golden v1 backups** (plain plus encrypted at 600k iterations) in `fixtures/backups/` are the compatibility baseline.
+  - **Phase 2-era records** are covered by compatibility tests, bringing unit tests to 119.
+  - **Bundle sizes:** about 298 kB per build, about 92 kB gzipped, 93 kB store zips; the Chrome and Edge zips are byte-identical.
+  - **Verdict:** ready for public GitHub review once the repository exists and CI passes. Not ready for store release; the blockers are live Gmail, real-browser testing, the Firefox ID, the final name, a CI run, the release mechanics and owner approval.
+- **All planned phases are complete.** Nothing has been published or pushed.
 
 Current layout: `apps/extension` (WXT, MV3), `packages/protocol` (zod schemas),
 `packages/task-core` (state machine, plan hash, approval checks; browser-safe),
@@ -424,7 +474,7 @@ Edge (Windows) — live Gmail not yet verified, see `docs/browser-compatibility.
 Next: 2d (native host shim, daemon, planning run, approval UI).
 
 Resolved decisions (recommended defaults):
-- D1: working name **Inbox Handoff**, button **"Send to Claude"** (placeholder).
+- D1: working name **Mail2Code**, button **"Send to Claude"** (placeholder).
 - D2: user's own Anthropic API key is the default auth path.
 - D3: DOM-only extraction for the MVP; Gmail API deferred, opt-in.
 - D4: license deferred — owner will choose; no LICENSE file until then.

@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { TASK_STATUSES, type TaskStatus } from "@inbox-handoff/protocol";
+import { TASK_STATUSES, type TaskStatus } from "@mail2code/protocol";
 import { IllegalTransitionError, STATUS_LABELS, assertTransition, canTransition, type TransitionCause } from "../src/index.ts";
 
 const CAUSES: TransitionCause[] = ["user_action", "user_approval", "system"];

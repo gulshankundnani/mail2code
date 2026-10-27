@@ -9,6 +9,12 @@ export const SELECTORS = {
   body: ["div.a3s", "div.ii.gt"],
   olderMessagesCount: ["span.adx"],
   toolbarAnchor: ["div[gh='mtb']", "div.G-atb"],
+  // Controls that make Gmail render collapsed messages. English labels only;
+  // the per-row strategy below works in every language.
+  expandAll: ["[aria-label='Expand all']", "[data-tooltip='Expand all']"],
+  // Rows of a conversation, expanded or collapsed. Gmail marks each message as
+  // a list item for accessibility; the other selectors are fallbacks.
+  messageRow: ["[role='listitem']", "div.kv", "div.adn"],
 } as const;
 
 export function queryFirst(root: ParentNode, selectors: readonly string[]): Element | null {

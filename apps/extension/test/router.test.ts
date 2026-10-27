@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CapturedConversation } from "@inbox-handoff/protocol";
+import type { CapturedConversation } from "@mail2code/protocol";
+import { createApprovalInbox } from "../src/approval-inbox.ts";
 import { createDraftStore, DRAFT_TTL_MS } from "../src/drafts.ts";
 import { buildTaskCreate, type ReviewForm } from "../src/handoff.ts";
 import { routeMessage, type RouterDeps } from "../src/router.ts";
@@ -43,8 +44,25 @@ function memoryKv() {
 
 function deps() {
   const opened: string[] = [];
-  const d: RouterDeps = { drafts: createDraftStore(memoryKv()), openReview: async (id) => void opened.push(id) };
-  return { d, opened };
+  const recorded: string[] = [];
+  const pages: string[] = [];
+  const handed: string[] = [];
+  const d: RouterDeps = {
+    approvals: createApprovalInbox(memoryKv()),
+    openApproval: async (_id, item) => {
+      handed.push(item.kind);
+      return item.block.includes("unreadable") ? { ok: false, error: "can't read" } : { ok: true, value: null };
+    },
+    drafts: createDraftStore(memoryKv()),
+    openReview: async (id) => void opened.push(id),
+    summarize: async () => ({ ok: true, value: { summary: "short summary" } }),
+    openPage: async (page) => void pages.push(page),
+    recordTask: async (task) => {
+      recorded.push(task.title);
+      return { ok: true, value: { taskId: "t1", created: true } };
+    },
+  };
+  return { d, opened, recorded, pages, handed };
 }
 
 describe("classifySender", () => {
@@ -75,6 +93,64 @@ describe("routeMessage", () => {
       expect(await routeMessage(msg, "gmail-content-script", d)).toEqual({ ok: false, error: "invalid_message" });
     }
     expect(await d.drafts.get(draftId)).not.toBeNull();
+  });
+
+  it("lets Gmail request a summary and record a validated task, but nothing else", async () => {
+    const { d, recorded } = deps();
+    const input = { subject: "Fix login", messages: [{ from: "Ada", date: "Oct 1", text: "Please fix" }] };
+    expect(await routeMessage({ kind: "summarize", input }, "gmail-content-script", d)).toEqual({ ok: true, value: { summary: "short summary" } });
+    const built = await buildTaskCreate(conversation, form());
+    if (!built.ok) throw new Error(built.error);
+    expect((await routeMessage({ kind: "task.record", task: built.task, destination: "desktop" }, "gmail-content-script", d)).ok).toBe(true);
+    expect(recorded).toEqual(["Fix login"]);
+    // Malformed tasks, unknown destinations and other capabilities are refused.
+    for (const msg of [
+      { kind: "task.record", task: { ...built.task, threadUrl: "https://evil.test" }, destination: "desktop" },
+      { kind: "task.record", task: built.task, destination: "shell" },
+      { kind: "plan.decide", taskId: "t1" },
+      { kind: "settings.set", apiKey: "x" },
+      { kind: "summarize", input: { subject: "x", messages: [] } },
+    ]) {
+      expect(await routeMessage(msg, "gmail-content-script", d)).toEqual({ ok: false, error: "invalid_message" });
+    }
+    expect(recorded).toHaveLength(1);
+  });
+
+  it("lets Gmail open only the task dashboard or settings page", async () => {
+    const { d, pages } = deps();
+    expect(await routeMessage({ kind: "open.page", page: "tasks" }, "gmail-content-script", d)).toEqual({ ok: true, value: null });
+    expect(await routeMessage({ kind: "open.page", page: "settings" }, "gmail-content-script", d)).toEqual({ ok: true, value: null });
+    for (const page of ["backup", "https://evil.test", "../review.html"])
+      expect(await routeMessage({ kind: "open.page", page }, "gmail-content-script", d)).toEqual({ ok: false, error: "invalid_message" });
+    expect(await routeMessage({ kind: "open.page", page: "tasks" }, "untrusted", d)).toEqual({ ok: false, error: "sender_not_allowed" });
+    expect(pages).toEqual(["tasks", "settings"]);
+  });
+
+  it("lets Gmail hand over an approval email, which only extension pages can read back", async () => {
+    const { d, handed } = deps();
+    const item = { kind: "request" as const, block: "-----BEGIN MAIL2CODE APPROVAL REQUEST-----x", from: "Ada <ada@example.test>", account: 0 };
+    expect(await routeMessage({ kind: "approval.block", item }, "gmail-content-script", d)).toEqual({ ok: true, value: null });
+    expect(handed).toEqual(["request"]);
+    // Malformed hand-overs are refused; an unreadable one is reported and dropped.
+    for (const bad of [{ ...item, kind: "approve" }, { ...item, account: 1000 }, { ...item, block: "" }, { ...item, extra: 1 }]) {
+      expect(await routeMessage({ kind: "approval.block", item: bad }, "gmail-content-script", d)).toEqual({ ok: false, error: "invalid_message" });
+    }
+    expect(await routeMessage({ kind: "approval.block", item: { ...item, block: "unreadable" } }, "gmail-content-script", d)).toEqual({ ok: false, error: "can't read" });
+    // Gmail can't read hand-overs back, and can't record approvals.
+    expect(await routeMessage({ kind: "approval.get", itemId: crypto.randomUUID() }, "gmail-content-script", d)).toEqual({ ok: false, error: "invalid_message" });
+    expect(await routeMessage({ kind: "approval.import", text: "x" }, "gmail-content-script", d)).toEqual({ ok: false, error: "invalid_message" });
+    const id = await d.approvals.put(item);
+    expect(await routeMessage({ kind: "approval.get", itemId: id }, "extension-page", d)).toEqual({ ok: true, value: item });
+    await routeMessage({ kind: "approval.discard", itemId: id }, "extension-page", d);
+    expect(await routeMessage({ kind: "approval.get", itemId: id }, "extension-page", d)).toEqual({ ok: false, error: "approval_not_found" });
+  });
+
+  it("extension pages can't use the Gmail-only routes", async () => {
+    const { d, recorded } = deps();
+    const built = await buildTaskCreate(conversation, form());
+    if (!built.ok) throw new Error(built.error);
+    expect(await routeMessage({ kind: "task.record", task: built.task, destination: "desktop" }, "extension-page", d)).toEqual({ ok: false, error: "invalid_message" });
+    expect(recorded).toHaveLength(0);
   });
 
   it("ignores untrusted senders entirely", async () => {

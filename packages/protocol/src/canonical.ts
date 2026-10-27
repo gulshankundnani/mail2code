@@ -16,5 +16,5 @@ export function canonicalJson(value: unknown): string {
 // Input to the duplicate-task key: the same messages for the same repository
 // with the same instructions are treated as a duplicate.
 export function idempotencyMaterial(h: { threadId: string; messageIds: string[]; repositoryRef: string; instructions: string }): string {
-  return canonicalJson({ domain: "inbox-handoff/handoff/v1", ...h, messageIds: [...h.messageIds].sort() });
+  return canonicalJson({ domain: "mail2code/handoff/v1", ...h, messageIds: [...h.messageIds].sort() });
 }

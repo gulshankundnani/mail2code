@@ -27,11 +27,11 @@ and add a migration for the previous version (see
 
 - [ ] `npm ci`, `npm run typecheck`, `npm test`.
 - [ ] `npm run test:e2e` (Chromium and Edge).
-- [ ] `npm run -w @inbox-handoff/extension build:all`, then `npm run check:manifests`.
+- [ ] `npm run -w @mail2code/extension build:all`, then `npm run check:manifests`.
 - [ ] `npm run scan:secrets`.
 - [ ] `npx web-ext@10.8.0 lint --source-dir apps/extension/dist/firefox-mv3` — 0 errors.
 - [ ] Bundle sizes recorded in [browser-compatibility.md](browser-compatibility.md).
-- [ ] A backup exported by the previous release imports correctly.
+- [ ] Backup compatibility: the golden v1 backups in `fixtures/backups/` import (covered by `npm test`), and a backup exported by the previous release imports correctly. Before releasing a new backup format version, add golden files for it.
 
 ### Manual checks (record results in browser-compatibility.md)
 
@@ -41,8 +41,8 @@ and add a migration for the previous version (see
 
 ### Package
 
-- [ ] `npm run -w @inbox-handoff/extension zip:all` produces
-      `inbox-handoff-<version>-chrome.zip`, `-edge.zip`, `-firefox.zip` and
+- [ ] `npm run -w @mail2code/extension zip:all` produces
+      `mail2code-<version>-chrome.zip`, `-edge.zip`, `-firefox.zip` and
       `-sources.zip` (Firefox reviewers need the sources zip).
 - [ ] Record SHA-256 checksums of the zips in the release notes.
 

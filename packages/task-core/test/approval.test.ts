@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlanDecision } from "@inbox-handoff/protocol";
+import type { PlanDecision } from "@mail2code/protocol";
 import { hasCurrentApproval, planHash, verifyDecision, verifyPlanIntegrity, type ApprovalRecord, type PlanRecord } from "../src/index.ts";
 
 const TASK = "11111111-1111-4111-8111-111111111111";

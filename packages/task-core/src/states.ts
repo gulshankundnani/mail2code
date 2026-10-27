@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@inbox-handoff/protocol";
+import type { TaskStatus } from "@mail2code/protocol";
 
 // Who is asking for a transition. With the browser handoff the extension cannot
 // observe the remote Claude session, so every step past "HandoffOpened" is

@@ -1,11 +1,14 @@
-import { TASK_STATUSES, type RetentionDays } from "@inbox-handoff/protocol";
-import { STATUS_LABELS } from "@inbox-handoff/task-core";
+import { TASK_STATUSES, type RetentionDays } from "@mail2code/protocol";
+import { STATUS_LABELS } from "@mail2code/task-core";
 import { browser } from "wxt/browser";
 import type { TaskRecord } from "../../src/db/schema.ts";
 import { TaskRepo } from "../../src/db/task-repo.ts";
 import { INTEGRATIONS } from "../../src/integrations.ts";
 import { EMPTY_QUERY, filterTasks, queryFromParams, queryToParams, type DateField, type StatusFilter, type TaskQuery } from "../../src/task-filter.ts";
 import { $, el, errorText, formatTime, setStatus } from "../../src/ui.ts";
+import { initApproved } from "./approved.ts";
+import { initApprovers } from "./approvers.ts";
+import { initSettings } from "./settings.ts";
 
 let repo: TaskRepo;
 let all: TaskRecord[] = [];
@@ -109,3 +112,6 @@ async function init() {
 }
 
 void init().catch((err) => setStatus(`Couldn't load tasks: ${errorText(err)}`, "error"));
+void initSettings().catch((err) => setStatus(`Couldn't load settings: ${errorText(err)}`, "error", "settings-status"));
+void initApprovers().catch((err) => setStatus(`Couldn't load approvers: ${errorText(err)}`, "error", "approvers-status"));
+void initApproved().catch((err) => setStatus(`Couldn't load approvals: ${errorText(err)}`, "error", "approved-status"));

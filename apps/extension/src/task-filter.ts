@@ -1,4 +1,4 @@
-import { CLOSED_STATUSES, TASK_STATUSES, type TaskStatus } from "@inbox-handoff/protocol";
+import { CLOSED_STATUSES, TASK_STATUSES, type TaskStatus } from "@mail2code/protocol";
 import type { TaskRecord } from "./db/schema.ts";
 
 export type StatusFilter = "all" | "active" | "needs-you" | "done" | TaskStatus;

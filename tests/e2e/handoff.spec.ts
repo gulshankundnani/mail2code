@@ -22,12 +22,19 @@ test.describe("Gmail capture and review", () => {
     });
   });
 
-  test("whole conversation includes every expanded message and flags collapsed ones", async ({ context, openGmail }) => {
+  test("whole conversation includes messages Gmail had collapsed", async ({ context, openGmail }) => {
     const review = await openReview(context, await openGmail("thread.html"));
-    await expect(review.locator("#collapsed-note")).toContainText("3 collapsed messages are not included");
-    await review.getByLabel(/Whole conversation \(2 expanded messages\)/).check();
+    await expect(review.locator("#collapsed-note")).toBeHidden();
+    await review.getByLabel(/Whole conversation \(5 expanded messages\)/).check();
     const payload = JSON.parse((await review.locator("#payload").textContent()) ?? "{}");
-    expect(payload.messages.map((m: { messageId: string }) => m.messageId)).toEqual(["msg-f:1790000000000000022", "msg-f:1790000000000000023"]);
+    expect(payload.messages.map((m: { messageId: string }) => m.messageId)).toEqual([
+      "msg-f:1790000000000000019",
+      "msg-f:1790000000000000020",
+      "msg-f:1790000000000000021",
+      "msg-f:1790000000000000022",
+      "msg-f:1790000000000000023",
+    ]);
+    expect(JSON.stringify(payload)).toContain("Kick-off: we agreed to ship version 2.0");
     expect(JSON.stringify(payload)).not.toContain("must never be captured");
   });
 
@@ -55,15 +62,19 @@ test.describe("Gmail capture and review", () => {
     let opened = false;
     context.on("page", () => (opened = true));
     await sendButton(gmail).click();
-    await expect(gmail.locator("[data-inbox-handoff] [role=status]")).toContainText("couldn't be identified reliably");
+    await expect(gmail.locator("[data-mail2code] [role=status]")).toContainText("couldn't be identified reliably");
     expect(opened).toBe(false);
   });
 
-  test("the button is operable by keyboard", async ({ context, openGmail }) => {
+  test("the button and card are operable by keyboard", async ({ openGmail }) => {
     const gmail = await openGmail("single-message.html");
     await sendButton(gmail).focus();
-    const [review] = await Promise.all([context.waitForEvent("page"), gmail.keyboard.press("Enter")]);
-    await expect(review.getByRole("heading", { name: "Review before creating a task" })).toBeVisible();
+    await gmail.keyboard.press("Enter");
+    const dialog = gmail.locator("[data-mail2code-card]").getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(gmail.locator("[data-mail2code-card]").getByRole("link", { name: /Open in/ })).toBeFocused();
+    await gmail.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
   });
 });
 

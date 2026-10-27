@@ -1,4 +1,4 @@
-import { canonicalJson } from "@inbox-handoff/protocol";
+import { canonicalJson } from "@mail2code/protocol";
 import type { ExportData, ExportFile, ExportTask } from "./format.ts";
 
 export type ImportStrategy = "restore" | "merge" | "replace";

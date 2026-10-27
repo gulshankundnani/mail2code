@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review an approval request – Mail2Code</title>
+  <link rel="stylesheet" href="../../assets/common.css">
+</head>
+<body>
+  <main>
+    <p><a id="all-tasks" href="#">← Task dashboard</a></p>
+    <h1>Review an approval request</h1>
+    <div id="status" role="status" aria-live="polite"></div>
+
+    <section id="load-box" aria-labelledby="h-load">
+      <h2 id="h-load">Request</h2>
+      <p class="hint">Opened from Gmail, the request appears below by itself. If you received it another way, paste it or choose the file.</p>
+      <label for="request-text">Paste the request</label>
+      <textarea id="request-text" rows="4" spellcheck="false" placeholder="-----BEGIN MAIL2CODE APPROVAL REQUEST-----"></textarea>
+      <label for="request-file">…or choose a request file</label>
+      <input id="request-file" type="file" accept=".json,application/json,.txt">
+    </section>
+
+    <section id="review-box" aria-labelledby="h-review" hidden>
+      <h2 id="h-review">Plan to review</h2>
+      <dl class="facts">
+        <dt>From</dt><dd id="req-from"></dd>
+        <dt>Task</dt><dd id="req-task"></dd>
+        <dt>Plan</dt><dd id="req-plan"></dd>
+        <dt>Valid until</dt><dd id="req-expires"></dd>
+      </dl>
+      <pre id="req-plan-text" tabindex="0"></pre>
+      <p class="notice">
+        Your decision is signed with your approver key and refers to exactly this plan version. If the plan changes, the
+        requester has to ask you again. Signing doesn't send anything: you send the reply email yourself.
+      </p>
+      <fieldset>
+        <legend>Your decision</legend>
+        <label><input type="radio" name="decision" value="approve"> Approve this plan</label>
+        <label><input type="radio" name="decision" value="request_changes"> Request changes</label>
+        <label><input type="radio" name="decision" value="reject"> Reject</label>
+      </fieldset>
+      <label for="comment">Comment (optional)</label>
+      <textarea id="comment" rows="2" maxlength="5000"></textarea>
+      <div class="actions">
+        <button type="button" id="sign" disabled>Sign and reply by email</button>
+      </div>
+    </section>
+
+    <section id="done-box" aria-labelledby="h-done" hidden>
+      <h2 id="h-done">Signed</h2>
+      <p id="done-text"></p>
+      <div class="actions">
+        <button type="button" id="reopen-draft" class="secondary">Open the reply draft again</button>
+        <button type="button" id="copy-response" class="secondary">Copy the response</button>
+        <button type="button" id="download-response" class="secondary">Download response file</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

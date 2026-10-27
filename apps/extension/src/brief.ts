@@ -1,4 +1,4 @@
-import { PLAN_SECTIONS } from "@inbox-handoff/protocol";
+import { PLAN_SECTIONS } from "@mail2code/protocol";
 import type { SnapshotRecord, TaskRecord } from "./db/schema.ts";
 
 function randomBoundary(): string {

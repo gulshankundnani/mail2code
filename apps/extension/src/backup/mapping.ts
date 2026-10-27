@@ -10,8 +10,8 @@ import {
   type ExportFile,
   type ExportTask,
   type ImportSelection,
-} from "@inbox-handoff/backup";
-import { CLOSED_STATUSES, type TaskStatus } from "@inbox-handoff/protocol";
+} from "@mail2code/backup";
+import { CLOSED_STATUSES, type TaskStatus } from "@mail2code/protocol";
 import type { ApprovalRecord, EventRecord, PlanRecord, SnapshotRecord, TaskRecord } from "../db/schema.ts";
 import type { DatabaseDump, ImportOperation } from "../db/task-repo.ts";
 
@@ -52,6 +52,7 @@ export function toExportData(dump: DatabaseDump, opts: ExportOptions): ExportDat
         lastRefreshAt: toIsoOrNull(t.lastRefreshAt),
         contextChangedAt: toIsoOrNull(t.contextChangedAt),
         handoff: { preparedAt: toIsoOrNull(t.handoff.preparedAt), openedAt: toIsoOrNull(t.handoff.openedAt), destination: t.handoff.destination },
+        requiredApprover: t.requiredApprover ?? null,
       };
       const stored = snapshots.get(t.id)?.messages ?? [];
       if (opts.includeEmailContent && stored.length > 0) out.emailContent = stored.map((m) => ({ messageId: m.messageId, bodyText: m.bodyText }));
@@ -74,12 +75,18 @@ export function toExportData(dump: DatabaseDump, opts: ExportOptions): ExportDat
         comment: a.comment,
         decidedAt: toIso(a.decidedAt),
         supersededAt: toIsoOrNull(a.supersededAt),
+        signedBy: a.signedBy ?? null,
       })),
     events: dump.events
       .filter((e) => ids.has(e.taskId))
       .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
       .map((e) => ({ taskId: e.taskId, at: toIso(e.at), type: e.type, data: e.data as ExportData["events"][number]["data"] })),
     settings: { retentionDays: dump.retentionDays },
+    // Public keys only; this browser's own signing key is never exported.
+    approvers: dump.approvers
+      .slice()
+      .sort((a, b) => a.addedAt - b.addedAt)
+      .map((a) => ({ fingerprint: a.fingerprint, name: a.name, email: a.email, publicKey: a.publicKey, addedAt: toIso(a.addedAt) })),
   };
 }
 
@@ -129,6 +136,7 @@ export function toImportOperation(file: ExportFile, selection: ImportSelection, 
       lastRefreshAt: toMsOrNull(t.lastRefreshAt),
       contextChangedAt: toMsOrNull(t.contextChangedAt),
       handoff: { preparedAt: toMsOrNull(t.handoff.preparedAt), openedAt: toMsOrNull(t.handoff.openedAt), destination: t.handoff.destination },
+      requiredApprover: t.requiredApprover,
     });
     // Closed tasks start a fresh retention countdown from the import.
     snapshots.push({ taskId: t.id, messages: t.emailContent ?? [], closedAt: CLOSED_STATUSES.has(t.status) ? now : null, purgedAt: null });
@@ -152,6 +160,7 @@ export function toImportOperation(file: ExportFile, selection: ImportSelection, 
       decision: a.decision,
       comment: a.comment,
       origin: "imported",
+      signedBy: a.signedBy,
       decidedAt: toMs(a.decidedAt),
       // Every imported approval is history: none counts as current.
       supersededAt: a.supersededAt ? toMs(a.supersededAt) : now,
@@ -164,6 +173,8 @@ export function toImportOperation(file: ExportFile, selection: ImportSelection, 
     plans,
     approvals,
     events,
+    // Arrive unconfirmed (see TaskRepo.applyImport): trust must be re-established.
+    approvers: file.data.approvers.map((a) => ({ fingerprint: a.fingerprint, name: a.name, email: a.email, publicKey: a.publicKey, addedAt: toMs(a.addedAt), confirmedAt: null, source: "backup" })),
     ...(selection.applySettings ? { retentionDays: file.data.settings.retentionDays } : {}),
   };
 }

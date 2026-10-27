@@ -48,7 +48,7 @@ test.describe("task list", () => {
     const list = await openPage("options.html");
     await expect(list.getByLabel("Delete stored email text")).toHaveValue("30");
     await list.getByLabel("Delete stored email text").selectOption("7");
-    await expect(list.getByRole("status")).toContainText("deleted 7 days after a task closes");
+    await expect(list.locator("#status")).toContainText("deleted 7 days after a task closes");
     await list.reload();
     await expect(list.getByLabel("Delete stored email text")).toHaveValue("7");
   });
@@ -65,13 +65,14 @@ test.describe("context refresh", () => {
     const review = await openReview(context, gmail);
     await expect(review.locator("#refresh-section")).toBeVisible();
     await review.getByLabel(/Whole conversation/).check();
-    await expect(review.locator("#refresh-tasks")).toContainText("1 new message");
+    // The first capture used only the latest message; the other four are new.
+    await expect(review.locator("#refresh-tasks")).toContainText("4 new messages");
     await review.getByRole("button", { name: "Add new messages to this task" }).click();
-    await expect(review.getByRole("status")).toContainText("Added 1 new message to the task.");
+    await expect(review.getByRole("status")).toContainText("Added 4 new messages to the task.");
     await review.getByRole("link", { name: "Open the task" }).click();
-    await expect(review.locator("#sources li")).toHaveCount(2);
+    await expect(review.locator("#sources li")).toHaveCount(5);
     await expect(review.locator("#refresh-info")).toContainText("Last refreshed");
-    await expect(review.locator("#history")).toContainText("Context refreshed: 1 new message added");
+    await expect(review.locator("#history")).toContainText("Context refreshed: 4 new messages added");
   });
 
   test("new messages after approval block the task; nothing is approved automatically", async ({ context, extensionId, openGmail }) => {

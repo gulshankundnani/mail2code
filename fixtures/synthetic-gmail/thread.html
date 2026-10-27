@@ -10,26 +10,75 @@
     <div class="a3s aiL">This must never be captured.</div>
   </div>
 </div>
-<div role="main">
+<div role="main" id="conversation">
   <div gh="mtb" class="G-atb"><div role="button" aria-label="Archive">Archive</div></div>
   <h2 class="hP" data-thread-perm-id="thread-f:1790000000000000002">Release checklist</h2>
-  <div role="button" class="adx-bar"><span class="adx">2</span> older messages</div>
-  <div class="adn ads" data-message-id="#msg-f:1790000000000000021">
-    <span class="gD" email="lin@example.test" name="Lin">Lin</span>
-    <span class="g3" title="Oct 2, 2026, 9:00 AM">Oct 2</span>
-    <!-- collapsed: no rendered body -->
-    <div class="snippet">Earlier note…</div>
-  </div>
-  <div class="adn ads" data-message-id="#msg-f:1790000000000000022">
-    <span class="gD" email="ada@example.test" name="Ada Example">Ada Example</span>
-    <span class="g3" title="Oct 3, 2026, 11:30 AM">Oct 3</span>
-    <div class="a3s aiL"><p>Please add a changelog entry before the release.</p><p>Deadline: Friday.</p></div>
-  </div>
-  <div class="adn ads" data-message-id="#msg-f:1790000000000000023">
-    <span class="gD" email="ravi@example.test" name="रवि कुमार">रवि कुमार</span>
-    <span class="g3" title="Oct 4, 2026, 8:15 AM">Oct 4</span>
-    <div class="a3s aiL" dir="rtl"><div>مرحبا — the version should be 2.0 ✅</div><div>नमस्ते, also update the README.</div></div>
+  <div role="list" id="messages">
+    <div role="button" class="adx-bar" id="older-bar"><span class="adx">2</span> older messages</div>
+    <div role="listitem" class="adn ads" data-message-id="#msg-f:1790000000000000021">
+      <span class="gD" email="lin@example.test" name="Lin">Lin</span>
+      <span class="g3" title="Oct 2, 2026, 9:00 AM">Oct 2</span>
+      <!-- collapsed: no rendered body until pressed -->
+      <div class="snippet">Earlier note…</div>
+    </div>
+    <div role="listitem" class="adn ads" data-message-id="#msg-f:1790000000000000022">
+      <span class="gD" email="ada@example.test" name="Ada Example">Ada Example</span>
+      <span class="g3" title="Oct 3, 2026, 11:30 AM">Oct 3</span>
+      <div class="a3s aiL"><p>Please add a changelog entry before the release.</p><p>Deadline: Friday.</p></div>
+    </div>
+    <div role="listitem" class="adn ads" data-message-id="#msg-f:1790000000000000023">
+      <span class="gD" email="ravi@example.test" name="रवि कुमार">रवि कुमार</span>
+      <span class="g3" title="Oct 4, 2026, 8:15 AM">Oct 4</span>
+      <div class="a3s aiL" dir="rtl"><div>مرحبا — the version should be 2.0 ✅</div><div>नमस्ते, also update the README.</div></div>
+    </div>
   </div>
 </div>
+<script>
+  // Models Gmail: text of collapsed messages isn't in the page until the row
+  // is pressed (Gmail reacts to mousedown), and "N older messages" first has to
+  // reveal its collapsed rows. Bodies arrive a moment later, as they do in Gmail.
+  const BODIES = {
+    "msg-f:1790000000000000019": "Kick-off: we agreed to ship version 2.0 at the end of the month.",
+    "msg-f:1790000000000000020": "Can someone own the release notes?",
+    "msg-f:1790000000000000021": "Earlier note: please also update the install docs.",
+  };
+  function expand(row) {
+    if (row.querySelector(".a3s")) return;
+    const id = row.getAttribute("data-message-id").replace(/^#/, "");
+    setTimeout(() => {
+      row.querySelector(".snippet")?.remove();
+      const body = document.createElement("div");
+      body.className = "a3s aiL";
+      body.textContent = BODIES[id] ?? "";
+      row.append(body);
+    }, 120);
+  }
+  function collapsedRow(id, name, email, date) {
+    const row = document.createElement("div");
+    row.setAttribute("role", "listitem");
+    row.className = "adn ads";
+    row.setAttribute("data-message-id", "#" + id);
+    row.innerHTML = '<span class="gD"></span><span class="g3"></span><div class="snippet">…</div>';
+    row.querySelector(".gD").setAttribute("email", email);
+    row.querySelector(".gD").setAttribute("name", name);
+    row.querySelector(".gD").textContent = name;
+    row.querySelector(".g3").setAttribute("title", date);
+    return row;
+  }
+  document.getElementById("messages").addEventListener("mousedown", (e) => {
+    const bar = e.target.closest("#older-bar");
+    if (bar) {
+      setTimeout(() => {
+        bar.replaceWith(
+          collapsedRow("msg-f:1790000000000000019", "Sam", "sam@example.test", "Sep 28, 2026, 10:00 AM"),
+          collapsedRow("msg-f:1790000000000000020", "Kim", "kim@example.test", "Sep 30, 2026, 4:00 PM"),
+        );
+      }, 120);
+      return;
+    }
+    const row = e.target.closest("[role='listitem']");
+    if (row) expand(row);
+  });
+</script>
 </body>
 </html>
